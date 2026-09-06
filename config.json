@@ -1,0 +1,51 @@
+{
+  "wmPort": 3000,
+  "wmBase": "http://localhost:3000",
+  "paper": true,
+  "venues": {
+    "scan": "kraken",
+    "fills": "paper"
+  },
+  "bank": {
+    "startingUsd": 587.48,
+    "allocatedUsd": 587.48,
+    "currency": "USD",
+    "lockedUsd": 0
+  },
+  "kraken": {
+    "passKey": "kraken/trading-desk-key",
+    "passSecret": "kraken/trading-desk-secret"
+  },
+  "kellyCap": 0.06,
+  "maxOpenBooks": 7,
+  "live": {
+    "maxFillsPerCycle": 1,
+    "oflags": "viqc,fciq"
+  },
+  "edgeMin": 0.08,
+  "fee": {
+    "rate": 0.004
+  },
+  "risk": {
+    "volumeRatioClose": 0.2,
+    "pollSeconds": 900,
+    "ohlcInterval": 60,
+    "haltDrawdown": 0.5,
+    "haltUntilHuman": true
+  },
+  "scan": {
+    "pollSeconds": 900,
+    "maxCandidates": 10,
+    "volume24hMin": 100000,
+    "maxSpread": 0.004
+  },
+  "models": {
+    "chief": "cursor-grok-4.6-high",
+    "scan": "composer-2.5",
+    "vet": "cursor-grok-4.6-high",
+    "book": "cursor-grok-4.6-high",
+    "size": "cursor-grok-4.6-high",
+    "fills": "composer-2.5",
+    "risk": "cursor-grok-4.6-high"
+  }
+}

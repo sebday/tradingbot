@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+ledger/*.jsonl
+!ledger/.gitkeep
+ledger/universe-kraken.json
+ledger/halt.json
