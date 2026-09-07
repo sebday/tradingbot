@@ -1,6 +1,6 @@
 ---
 name: desk-cycle
-description: Run one live Kraken cycle of the trading desk, then wake again in 15 minutes. Universe is online Kraken USD spot pairs. Fans SCAN then VET, SIZE on PASS/PASS_PARTIAL, FILLS via kraken_execute, then RISK. BOOK is skipped. Use for /desk-cycle, run the desk, or run a trading cycle.
+description: Run one live Kraken cycle of the trading desk, then wake again in 60 minutes. Universe is online Kraken USD spot pairs. Fans SCAN then VET, SIZE on PASS/PASS_PARTIAL, FILLS via kraken_execute, then RISK. BOOK is skipped. Use for /desk-cycle, run the desk, or run a trading cycle.
 disable-model-invocation: true
 ---
 
@@ -77,16 +77,16 @@ Read ledger files for this `cycle_id`. Every candidate must have `pair_id`. Asse
 
 Empty PASS lists are valid.
 
-### 5. Arm the 15 minute loop
+### 5. Arm the 60 minute loop
 
 After the report, keep this desk running. Follow the Cursor loop skill for a local session.
 
-- Fixed interval: 900 seconds.
+- Fixed interval: 3600 seconds.
 - Sentinel: `AGENT_LOOP_TICK_desk-cycle`
 - Prompt: `/desk-cycle`
-- Title the shell `Loop every 15m: /desk-cycle`
+- Title the shell `Loop every 60m: /desk-cycle`
 
-Check existing terminals first. If a matching loop is already running, do not start another. On the first `/desk-cycle` of a session, run the cycle now, then arm the sleeper so the next tick is 15 minutes later.
+Check existing terminals first. If a matching loop is already running, do not start another. On the first `/desk-cycle` of a session, run the cycle now, then arm the sleeper so the next tick is 60 minutes later.
 
 Closing this chat stops the desk.
 

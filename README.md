@@ -38,7 +38,7 @@ Writes `ledger/context.json`. SCAN may rerank existing Kraken pairs from those s
 
 Open this folder in a Cursor agent chat and type `/desk-cycle`.
 
-CHIEF fans the seats, then arms a 15 minute `/loop`. RISK uses hourly OHLC, so faster ticks would not see new bars.
+CHIEF fans the seats, then arms a 60 minute `/loop`. RISK uses hourly OHLC, so this matches the bar.
 
 Leave the chat open. Closing Cursor stops the desk.
 

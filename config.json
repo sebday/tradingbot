@@ -28,13 +28,13 @@
   },
   "risk": {
     "volumeRatioClose": 0.2,
-    "pollSeconds": 900,
+    "pollSeconds": 3600,
     "ohlcInterval": 60,
     "haltDrawdown": 0.5,
     "haltUntilHuman": true
   },
   "scan": {
-    "pollSeconds": 900,
+    "pollSeconds": 3600,
     "maxCandidates": 10,
     "volume24hMin": 100000,
     "maxSpread": 0.004

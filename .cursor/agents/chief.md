@@ -33,7 +33,7 @@ Models from config.json:
 Pass cycle_id, free cash, open pair_ids, and pair_id/wsname rules in every Task prompt.
 
 4. LOOP
- /desk-cycle is the repeating desk. After each report, a 15 minute Cursor /loop
+ /desk-cycle is the repeating desk. After each report, a 60 minute Cursor /loop
  wakes this chat and you fan the seats again. Do not replace the seats with a script.
  If Kraken public endpoints fail, halt new entries. Open positions still belong to RISK.
 
