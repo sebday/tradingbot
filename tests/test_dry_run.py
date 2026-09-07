@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dry-run tests: Kraken universe, ticket math, halt. No live orders. No mechanical desk."""
+"""Dry-run tests: Kraken universe, ticket math, halt, context. No AddOrder."""
 from __future__ import annotations
 
 import json
@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+import desk_context  # noqa: E402
 import desk_halt  # noqa: E402
 import kraken_universe as ku  # noqa: E402
 
@@ -23,6 +24,7 @@ FORBIDDEN = (
     "kalshi.com",
     "pump.fun",
     "x.ai/bot",
+    "api.worldmonitor.app",
 )
 
 
@@ -70,17 +72,42 @@ class TicketAndRisk(unittest.TestCase):
         self.assertEqual(ku.round_quote_usd(33.591), "33.59")
         self.assertEqual(ku.round_quote_usd(5), "5.00")
 
+    def test_round_base_uses_lot_decimals(self):
+        self.assertEqual(ku.round_base(782.36919, 5), "782.36919")
+        self.assertEqual(ku.round_base(0.01330804, 8), "0.01330804")
 
-class PaperDeskShape(unittest.TestCase):
-    def test_config_is_paper_kraken(self):
+
+class ContextSignals(unittest.TestCase):
+    def test_build_signals_flags_fear_and_vix(self):
+        cnn = {"score": 22.0, "rating": "extreme fear", "endpoint": "https://production.dataviz.cnn.io/index/fearandgreed/current"}
+        crypto = {"score": 73, "rating": "Greed", "endpoint": "https://api.alternative.me/fng/?limit=1"}
+        vix = {"last": 31.2, "endpoint": "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX"}
+        quotes = [
+            {"symbol": "SOL", "change": 12.5, "endpoint": "https://api.coinpaprika.com/v1/tickers/sol-solana"},
+            {"symbol": "BTC", "change": 0.2, "endpoint": "https://api.coinpaprika.com/v1/tickers/btc-bitcoin"},
+        ]
+        signals = desk_context.build_signals(cnn, crypto, vix, quotes)
+        types = {s["type"] for s in signals}
+        self.assertIn("CNN_FEAR_GREED", types)
+        self.assertIn("CRYPTO_FEAR_GREED", types)
+        self.assertIn("VIX_SPIKE", types)
+        self.assertIn("CRYPTO_MOVE", types)
+        self.assertTrue(any(s["id"] == "paprika:SOL" for s in signals))
+        self.assertFalse(any(s["id"] == "paprika:BTC" for s in signals))
+
+
+class DeskShape(unittest.TestCase):
+    def test_config_is_live_kraken(self):
         cfg = json.loads((ROOT / "config.json").read_text())
-        self.assertTrue(cfg["paper"])
+        self.assertFalse(cfg["paper"])
         self.assertEqual(cfg["venues"]["scan"], "kraken")
-        self.assertEqual(cfg["venues"]["fills"], "paper")
+        self.assertEqual(cfg["venues"]["fills"], "kraken")
 
     def test_no_mechanical_cycle_script(self):
         self.assertFalse((SCRIPTS / "paper-cycle.py").exists())
         self.assertFalse((ROOT / "systemd").exists())
+        self.assertTrue((SCRIPTS / "kraken_execute.py").exists())
+        self.assertTrue((SCRIPTS / "desk_context.py").exists())
 
     def test_scripts_have_no_forbidden_venues(self):
         for f in SCRIPTS.rglob("*"):
@@ -110,6 +137,38 @@ class PaperDeskShape(unittest.TestCase):
                 all((p["quote"] or "").upper() in {"USD", "ZUSD"} for p in universe["pairs"])
             )
             self.assertTrue(all(p.get("pair_id") for p in universe["pairs"]))
+
+    def test_desk_context_writes_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.environ.copy()
+            env["TRADING_DESK_LEDGER"] = tmp
+            run = subprocess.run(
+                [sys.executable, str(SCRIPTS / "desk_context.py")],
+                cwd=str(ROOT),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr + run.stdout)
+            payload = json.loads((Path(tmp) / "context.json").read_text())
+            self.assertFalse(payload["unavailable"])
+            self.assertIn("signals", payload)
+            self.assertGreaterEqual(len(payload["signals"]), 1)
+
+    def test_execute_opens_does_not_order(self):
+        run = subprocess.run(
+            [sys.executable, str(SCRIPTS / "kraken_execute.py"), "opens"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr + run.stdout)
+        payload = json.loads(run.stdout)
+        self.assertEqual(payload["venue"], "kraken")
+        self.assertFalse(payload["paper"])
+        self.assertIn("opens", payload)
 
     def test_halted_flag_blocks_new_work(self):
         with tempfile.TemporaryDirectory() as tmp:

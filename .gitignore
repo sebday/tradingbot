@@ -7,4 +7,5 @@ __pycache__/
 ledger/*.jsonl
 !ledger/.gitkeep
 ledger/universe-kraken.json
+ledger/context.json
 ledger/halt.json

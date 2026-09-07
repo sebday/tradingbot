@@ -1,10 +1,10 @@
 {
   "wmPort": 3000,
   "wmBase": "http://localhost:3000",
-  "paper": true,
+  "paper": false,
   "venues": {
     "scan": "kraken",
-    "fills": "paper"
+    "fills": "kraken"
   },
   "bank": {
     "startingUsd": 587.48,

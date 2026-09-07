@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kraken private REST: load keys from pass, never print them. Query only."""
+"""Kraken private REST: load keys from pass, never print them."""
 from __future__ import annotations
 
 import base64

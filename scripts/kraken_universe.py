@@ -177,6 +177,12 @@ def round_quote_usd(dollars: float) -> str:
     return f"{max(0.0, dollars):.2f}"
 
 
+def round_base(qty: float, lot_decimals: int | None) -> str:
+    decimals = int(lot_decimals if lot_decimals is not None else 8)
+    q = round(float(qty), decimals)
+    return f"{q:.{decimals}f}"
+
+
 def volume_ratio_6h_24h(ohlc: list[list]) -> dict | None:
     if len(ohlc) < 24:
         return None
