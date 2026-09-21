@@ -64,10 +64,12 @@ Pass `usd_spot` / leftover assets / open pair_ids to SIZE and RISK.
 `subagent_type` is the agent file name. `model` from `config.json` `models`.
 
 1. SCAN (`composer-2.5`) on universe ∩ Ticker. Context from `ledger/context.json`.
-2. VET (`cursor-grok-4.6-high`) on SCAN's list. Nothing reaches SIZE without VET. STORY uses `ledger/context.json` signals.
-3. SIZE (`cursor-grok-4.6-high`) only on VET `PASS` / `PASS_PARTIAL`. Kelly clamp 6% of live free cash (`usd_spot`). `PASS_PARTIAL` cuts the ticket. Live `maxFillsPerCycle` is 1. `maxOpenBooks` counts open Kraken positions.
+2. VET (`inherit`) on SCAN's list. Nothing reaches SIZE without VET. STORY uses `ledger/context.json` signals.
+3. SIZE (`inherit`) only on VET `PASS` / `PASS_PARTIAL`. Kelly clamp 6% of live free cash (`usd_spot`). `PASS_PARTIAL` cuts the ticket. Live `maxFillsPerCycle` is 1. `maxOpenBooks` counts open Kraken positions.
 4. FILLS (`composer-2.5`) only on SIZE dollars > 0. Live: `python3 scripts/kraken_execute.py buy ...`. Never sign in the seat.
-5. RISK (`cursor-grok-4.6-high`) on open Kraken fills minus closes, plus leftover non-USD Kraken balances. Always run. Close via `python3 scripts/kraken_execute.py sell ...`. Kraken OHLC interval 60.
+5. RISK (`inherit`) on open Kraken fills minus closes, plus leftover non-USD Kraken balances. Always run. Close via `python3 scripts/kraken_execute.py sell ...`. Kraken OHLC interval 60.
+
+`inherit` means omit the Task `model` argument. The seat then runs on this chat's model: Grok 4.7, normal speed, not Fast. Do not pass `cursor-grok-4.6-high` or a Fast slug. SCAN and FILLS stay `composer-2.5`.
 
 If a seat Task fails, log it, do not invent its JSON, and do not skip RISK.
 
@@ -87,6 +89,8 @@ After the report, keep this desk running. Follow the Cursor loop skill for a loc
 - Title the shell `Loop every 60m: /desk-cycle`
 
 Check existing terminals first. If a matching loop is already running, do not start another. On the first `/desk-cycle` of a session, run the cycle now, then arm the sleeper so the next tick is 60 minutes later.
+
+The 15 minute exit loop is separate (`/desk-exit`, sentinel `AGENT_LOOP_TICK_desk-exit`). Do not start a second one. Do not stop it from this cycle.
 
 Closing this chat stops the desk.
 

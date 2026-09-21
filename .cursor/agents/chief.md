@@ -28,13 +28,18 @@ Never research names that are not online Kraken USD spot pairs.
 Nothing reaches SIZE without passing VET. RISK is never queued.
 Do not launch BOOK. If BOOK is invoked, it must log SKIPPED_UNIVERSE and stop.
 Models from config.json:
- SCAN composer-2.5, VET cursor-grok-4.6-high, SIZE cursor-grok-4.6-high,
- FILLS composer-2.5, RISK cursor-grok-4.6-high.
+ SCAN composer-2.5, VET inherit, SIZE inherit,
+ FILLS composer-2.5, RISK inherit.
+ inherit means omit the Task model argument so the seat runs on this chat's model.
+ This desk chat is Grok 4.7, normal speed, not Fast. Do not pass cursor-grok-4.6-high.
 Pass cycle_id, free cash, open pair_ids, and pair_id/wsname rules in every Task prompt.
 
 4. LOOP
  /desk-cycle is the repeating desk. After each report, a 60 minute Cursor /loop
  wakes this chat and you fan the seats again. Do not replace the seats with a script.
+ A second loop, /desk-exit, wakes every 15 minutes and runs RISK only, on composer-2.5.
+ That check uses the public ticker and OHLC. It calls the private API only to confirm
+ a qty and sell. Do not start a second copy of either loop. Do not stop one from the other.
  If Kraken public endpoints fail, halt new entries. Open positions still belong to RISK.
 
 5. REPORT

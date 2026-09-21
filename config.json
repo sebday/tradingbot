@@ -28,7 +28,11 @@
   },
   "risk": {
     "volumeRatioClose": 0.2,
+    "trailArmPct": 0.3,
+    "trailGiveback": 0.2,
+    "trailFloorPct": 0.1,
     "pollSeconds": 3600,
+    "exitPollSeconds": 900,
     "ohlcInterval": 60,
     "haltDrawdown": 0.5,
     "haltUntilHuman": true
@@ -40,12 +44,13 @@
     "maxSpread": 0.004
   },
   "models": {
-    "chief": "cursor-grok-4.6-high",
+    "chief": "inherit",
     "scan": "composer-2.5",
-    "vet": "cursor-grok-4.6-high",
-    "book": "cursor-grok-4.6-high",
-    "size": "cursor-grok-4.6-high",
+    "vet": "inherit",
+    "book": "inherit",
+    "size": "inherit",
     "fills": "composer-2.5",
-    "risk": "cursor-grok-4.6-high"
+    "risk": "inherit",
+    "exit": "composer-2.5"
   }
 }
