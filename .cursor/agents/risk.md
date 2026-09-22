@@ -55,8 +55,9 @@ SPEED IS THE EDGE, NOT SELECTION
 From a true close condition to the order: under 60 seconds.
 
 EXIT CHECK
-/desk-exit is RISK alone, every risk.exitPollSeconds (900). Model is config models.exit
-(composer-2.5). No SCAN, no VET, no SIZE, no FILLS, no new buys.
+Optional manual /desk-exit is RISK alone between hours. Model is config models.exit
+(composer-2.5). No SCAN, no VET, no SIZE, no FILLS, no new buys. The hourly /desk-cycle
+is the scheduled risk pass; do not assume a separate exit loop is running.
 Do not call kraken_balance.py or kraken_execute.py opens on the way in.
 Do not write halt.json on this path. The hourly cycle owns the pot halt.
 Measure VOLUME and TRAIL_PEAK from public OHLC and the public ticker last.

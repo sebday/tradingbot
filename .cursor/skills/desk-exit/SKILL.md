@@ -1,18 +1,20 @@
 ---
 name: desk-exit
-description: Run one RISK-only exit check on the live Kraken book, then wake again in 15 minutes. Public ticker and OHLC only, until a close is already true. Use for /desk-exit.
+description: Optional one-off RISK-only exit check (public ticker and OHLC until a close is true). The live desk does not run a separate loop; use /desk-cycle hourly RISK instead. Use for manual /desk-exit only.
 disable-model-invocation: true
 ---
 
-# Desk exit
+# Desk exit (manual)
 
-Run one exit check of the trading desk in `~/projects/trading-desk`. This is not a desk cycle.
+Optional. The repeating desk is **only** `/desk-cycle` every 60 minutes. That cycle's RISK seat owns volume and trail closes on the full hourly book read.
+
+Run this skill only when a human explicitly asks for an extra exit check between hours.
 
 No universe refresh. No context. No SCAN, VET, SIZE, or FILLS. No buys. BOOK stays unused.
 
-`config.json` `risk.exitPollSeconds` is 900. `models.exit` is `composer-2.5`.
+`models.exit` is `composer-2.5` if you Task RISK for this path.
 
-If a `/desk-cycle` is already running in this turn, skip this check. That cycle's RISK covers the book.
+Do not arm a sleeper loop. Do not start `AGENT_LOOP_TICK_desk-exit`.
 
 ## Hard limits
 
@@ -22,7 +24,6 @@ If a `/desk-cycle` is already running in this turn, skip this check. That cycle'
 - Never POST private Kraken except `scripts/kraken_execute.py sell` after a rule has already fired and one balance read has confirmed the qty.
 - Temporary lockout: do not retry. Do not sell.
 - CHIEF never sells. RISK does.
-- Do not start a second 15 minute loop. Do not stop the 60 minute `/desk-cycle` loop.
 
 ## Steps
 
@@ -53,16 +54,3 @@ Use `--rule TRAIL_PEAK` for the giveback close.
 ### 3. Report
 
 Append `ledger/reports.jsonl` with `kind` `exit`. Assemble, never invent. `scan` 0, `vet_pass` 0, `fills` 0. Record holds, closes, ratios, peaks, floors, and whether a private call happened.
-
-### 4. Arm the 15 minute loop
-
-Follow the Cursor loop skill for a local session.
-
-- Fixed interval: 900 seconds.
-- Sentinel: `AGENT_LOOP_TICK_desk-exit`
-- Prompt: `/desk-exit`
-- Title the shell `Loop every 15m: /desk-exit`
-
-Check existing terminals first. If that loop is already running, do not start another. On the first `/desk-exit` of a session, run the check now, then arm the sleeper so the next tick is 15 minutes later.
-
-Closing this chat stops the check.

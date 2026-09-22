@@ -38,7 +38,7 @@ Writes `ledger/context.json`. SCAN may rerank existing Kraken pairs from those s
 
 Open this folder in a Cursor agent chat and type `/desk-cycle`.
 
-CHIEF fans the seats, then arms a 60 minute `/loop`. A second loop, `/desk-exit`, runs RISK alone every 15 minutes on Composer. That check uses the public last price. It calls Kraken private only when a close is already true.
+CHIEF fans the seats, then arms a 60 minute `/loop`. RISK on each cycle checks volume and the peak trail on the open book. Optional manual `/desk-exit` exists; there is no second loop.
 
 Leave the chat open. Closing Cursor stops the desk.
 
@@ -66,8 +66,7 @@ The API key must allow Create & modify orders and Cancel; never Withdraw.
 | BOOK | unused | SKIPPED_UNIVERSE |
 | SIZE | inherit (this chat: Grok 4.7) | dollars only |
 | FILLS | composer-2.5 | `kraken_execute.py buy` |
-| RISK | inherit (this chat: Grok 4.7) | hourly OHLC close, `kraken_execute.py sell` |
-| EXIT | composer-2.5 | 15 minute RISK-only volume and trail check |
+| RISK | inherit (this chat: Grok 4.7) | hourly OHLC volume and trail, `kraken_execute.py sell` |
 
 ## Dry-run tests
 

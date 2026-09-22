@@ -37,9 +37,7 @@ Pass cycle_id, free cash, open pair_ids, and pair_id/wsname rules in every Task 
 4. LOOP
  /desk-cycle is the repeating desk. After each report, a 60 minute Cursor /loop
  wakes this chat and you fan the seats again. Do not replace the seats with a script.
- A second loop, /desk-exit, wakes every 15 minutes and runs RISK only, on composer-2.5.
- That check uses the public ticker and OHLC. It calls the private API only to confirm
- a qty and sell. Do not start a second copy of either loop. Do not stop one from the other.
+ Do not start a second desk loop. RISK on each hourly cycle is the only scheduled exit check.
  If Kraken public endpoints fail, halt new entries. Open positions still belong to RISK.
 
 5. REPORT

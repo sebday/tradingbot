@@ -32,7 +32,6 @@
     "trailGiveback": 0.2,
     "trailFloorPct": 0.1,
     "pollSeconds": 3600,
-    "exitPollSeconds": 900,
     "ohlcInterval": 60,
     "haltDrawdown": 0.5,
     "haltUntilHuman": true

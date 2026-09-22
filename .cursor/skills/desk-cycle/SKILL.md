@@ -90,7 +90,7 @@ After the report, keep this desk running. Follow the Cursor loop skill for a loc
 
 Check existing terminals first. If a matching loop is already running, do not start another. On the first `/desk-cycle` of a session, run the cycle now, then arm the sleeper so the next tick is 60 minutes later.
 
-The 15 minute exit loop is separate (`/desk-exit`, sentinel `AGENT_LOOP_TICK_desk-exit`). Do not start a second one. Do not stop it from this cycle.
+Do not arm a `/desk-exit` loop. Hourly RISK is the only scheduled risk pass.
 
 Closing this chat stops the desk.
 
