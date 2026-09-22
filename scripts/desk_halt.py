@@ -15,7 +15,7 @@ def utc_now() -> str:
 
 
 def ledger_dir() -> Path:
-    return Path(os.environ.get("TRADING_DESK_LEDGER") or ROOT / "ledger")
+    return Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
 
 
 def halt_path() -> Path:

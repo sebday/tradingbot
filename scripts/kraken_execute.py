@@ -16,7 +16,7 @@ import desk_halt  # noqa: E402
 import kraken_private as kp  # noqa: E402
 import kraken_universe as ku  # noqa: E402
 
-LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or ROOT / "ledger")
+LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
 CONFIG = json.loads((ROOT / "config.json").read_text())
 DUST_USD = 1.0
 
@@ -53,11 +53,26 @@ def fills_venue() -> str:
     return (CONFIG.get("venues") or {}).get("fills") or "paper"
 
 
+def is_close_row(row: dict) -> bool:
+    """HOLD notes live in closes.jsonl too. Only a real sell removes the book."""
+    action = str(row.get("action") or "").upper()
+    if action == "HOLD":
+        return False
+    if action == "CLOSE":
+        return True
+    status = str(row.get("status") or "").lower()
+    if status == "open":
+        return False
+    if status == "closed":
+        return True
+    return action == "" and status == ""
+
+
 def closed_keys() -> set[tuple[str, str]]:
     out: set[tuple[str, str]] = set()
     for row in load_jsonl("closes.jsonl"):
         pair_id = row.get("pair_id")
-        if pair_id:
+        if pair_id and is_close_row(row):
             out.add((pair_id, row.get("venue") or "paper"))
     return out
 

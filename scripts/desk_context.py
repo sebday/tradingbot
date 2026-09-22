@@ -10,11 +10,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or ROOT / "ledger")
+LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
+
+# Yahoo VIX is optional. A dead chart is logged in errors and does not degrade context.
+REQUIRED_SOURCES = ("cnn", "crypto_fg", "coinpaprika")
 
 PAPRIKA = {
     "btc-bitcoin": "BTC",
@@ -199,6 +202,14 @@ def build_signals(
     return signals
 
 
+def context_health(errors: list[str]) -> tuple[bool, bool]:
+    """Return (degraded, unavailable). A dead Yahoo VIX does not count."""
+    required_failed = [name for name in REQUIRED_SOURCES if name in errors]
+    unavailable = len(required_failed) == len(REQUIRED_SOURCES)
+    degraded = bool(required_failed)
+    return degraded, unavailable
+
+
 def fetch_all() -> dict:
     errors = []
     cnn = fetch_cnn_fear_greed()
@@ -213,12 +224,11 @@ def fetch_all() -> dict:
     quotes = fetch_coinpaprika()
     if not quotes:
         errors.append("coinpaprika")
-    sources_ok = 4 - len(errors)
-    degraded = sources_ok < 4
+    degraded, unavailable = context_health(errors)
     payload = {
         "fetchedAt": utc_now(),
-        "degraded": degraded or sources_ok == 0,
-        "unavailable": sources_ok == 0,
+        "degraded": degraded,
+        "unavailable": unavailable,
         "errors": errors,
         "cnn": cnn,
         "cryptoFearGreed": crypto_fg,

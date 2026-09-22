@@ -95,6 +95,23 @@ class ContextSignals(unittest.TestCase):
         self.assertTrue(any(s["id"] == "paprika:SOL" for s in signals))
         self.assertFalse(any(s["id"] == "paprika:BTC" for s in signals))
 
+    def test_dead_vix_does_not_degrade_context(self):
+        degraded, unavailable = desk_context.context_health(["vix"])
+        self.assertFalse(degraded)
+        self.assertFalse(unavailable)
+
+    def test_missing_required_source_still_degrades(self):
+        degraded, unavailable = desk_context.context_health(["vix", "cnn"])
+        self.assertTrue(degraded)
+        self.assertFalse(unavailable)
+
+    def test_required_sources_down_is_unavailable(self):
+        degraded, unavailable = desk_context.context_health(
+            ["cnn", "crypto_fg", "coinpaprika", "vix"]
+        )
+        self.assertTrue(degraded)
+        self.assertTrue(unavailable)
+
 
 class DeskShape(unittest.TestCase):
     def test_config_is_live_kraken(self):
@@ -105,7 +122,7 @@ class DeskShape(unittest.TestCase):
 
     def test_no_mechanical_cycle_script(self):
         self.assertFalse((SCRIPTS / "paper-cycle.py").exists())
-        self.assertFalse((ROOT / "systemd").exists())
+        self.assertTrue((ROOT / "bin" / "run-desk-cycle").exists())
         self.assertTrue((SCRIPTS / "kraken_execute.py").exists())
         self.assertTrue((SCRIPTS / "desk_context.py").exists())
 
@@ -155,6 +172,59 @@ class DeskShape(unittest.TestCase):
             self.assertFalse(payload["unavailable"])
             self.assertIn("signals", payload)
             self.assertGreaterEqual(len(payload["signals"]), 1)
+
+    def test_hold_rows_stay_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = Path(tmp)
+            arb = {
+                "pair_id": "ARBUSD",
+                "wsname": "ARB/USD",
+                "venue": "kraken",
+                "filled": 35.25,
+                "volume_base": 198.3,
+            }
+            ake = {
+                "pair_id": "AKEUSD",
+                "wsname": "AKE/USD",
+                "venue": "kraken",
+                "filled": 14.62,
+                "volume_base": 782.3,
+            }
+            hold = {
+                "pair_id": "ARBUSD",
+                "wsname": "ARB/USD",
+                "venue": "kraken",
+                "action": "HOLD",
+                "status": "open",
+            }
+            closed = {
+                "pair_id": "AKEUSD",
+                "wsname": "AKE/USD",
+                "venue": "kraken",
+                "action": "CLOSE",
+                "status": "closed",
+            }
+            (ledger / "fills.jsonl").write_text(
+                json.dumps(arb) + "\n" + json.dumps(ake) + "\n",
+                encoding="utf-8",
+            )
+            (ledger / "closes.jsonl").write_text(
+                json.dumps(hold) + "\n" + json.dumps(closed) + "\n",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["TRADING_DESK_LEDGER"] = tmp
+            run = subprocess.run(
+                [sys.executable, str(SCRIPTS / "kraken_execute.py"), "opens"],
+                cwd=str(ROOT),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr + run.stdout)
+            ids = {row["pair_id"] for row in json.loads(run.stdout)["opens"]}
+            self.assertEqual(ids, {"ARBUSD"})
 
     def test_execute_opens_does_not_order(self):
         run = subprocess.run(

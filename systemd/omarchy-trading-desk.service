@@ -1,0 +1,13 @@
+[Unit]
+Description=Omarchy Kraken desk cycle (cursor-agent /desk-cycle)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/omarchy-trading
+ExecStart=%h/projects/omarchy-trading/bin/run-desk-cycle
+TimeoutStartSec=45min
+
+[Install]
+WantedBy=default.target

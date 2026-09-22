@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Desk cycle
 
-Run one cycle of the trading desk in `~/projects/trading-desk`. Universe is Kraken USD spot. Models come from `config.json`.
+Run one cycle of the trading desk in `~/projects/omarchy-trading`. Universe is Kraken USD spot. Models come from `config.json`.
 
 This skill is the desk. Do not run a Python cycle in place of the seats.
 
@@ -37,7 +37,7 @@ If `paper` is true, FILLS writes ledger rows and does not call execute.
 ### 1. Universe
 
 ```bash
-python3 ~/projects/trading-desk/scripts/kraken_universe.py
+python3 ~/projects/omarchy-trading/scripts/kraken_universe.py
 ```
 
 If this fails, stop. Read `ledger/universe-kraken.json`. SCAN may only rank those `pair_id`s.
@@ -45,16 +45,16 @@ If this fails, stop. Read `ledger/universe-kraken.json`. SCAN may only rank thos
 ### 2. Context
 
 ```bash
-python3 ~/projects/trading-desk/scripts/desk_context.py
+python3 ~/projects/omarchy-trading/scripts/desk_context.py
 ```
 
-Writes `ledger/context.json` (CNN Fear & Greed, crypto F&G, Yahoo VIX, CoinPaprika). Down or partial is not fatal: mark SCAN `degraded` and continue. Never use prediction markets. Never call `api.worldmonitor.app`.
+Writes `ledger/context.json` (CNN Fear & Greed, crypto F&G, Yahoo VIX, CoinPaprika). A missing Yahoo VIX stays in `errors` and does not set `degraded`. CNN, crypto F&G, or CoinPaprika missing still sets `degraded`. Unavailable, or a missing file, marks SCAN `degraded` and the cycle continues. Never use prediction markets. Never call `api.worldmonitor.app`.
 
 If live, also:
 
 ```bash
-python3 ~/projects/trading-desk/scripts/kraken_balance.py
-python3 ~/projects/trading-desk/scripts/kraken_execute.py opens
+python3 ~/projects/omarchy-trading/scripts/kraken_balance.py
+python3 ~/projects/omarchy-trading/scripts/kraken_execute.py opens
 ```
 
 Pass `usd_spot` / leftover assets / open pair_ids to SIZE and RISK.
@@ -79,20 +79,23 @@ Read ledger files for this `cycle_id`. Every candidate must have `pair_id`. Asse
 
 Empty PASS lists are valid.
 
-### 5. Arm the 60 minute loop
+### 5. Scheduled loop (systemd)
 
-After the report, keep this desk running. Follow the Cursor loop skill for a local session.
+Hourly automation is **not** a Cursor chat tab. The `evo.trading` plugin ships:
 
-- Fixed interval: 3600 seconds.
-- Sentinel: `AGENT_LOOP_TICK_desk-cycle`
-- Prompt: `/desk-cycle`
-- Title the shell `Loop every 60m: /desk-cycle`
+- `bin/run-desk-cycle` — one `cursor-agent -p "/desk-cycle"` with flock
+- `systemd --user` timer `omarchy-trading-desk.timer` (every 3600s, on boot)
 
-Check existing terminals first. If a matching loop is already running, do not start another. On the first `/desk-cycle` of a session, run the cycle now, then arm the sleeper so the next tick is 60 minutes later.
+After the report, do **not** arm `AGENT_LOOP_TICK_desk-cycle`. Do not start a bash sleep loop in a terminal.
+
+If the timer is not enabled, tell the human:
+
+```bash
+systemctl --user link ~/projects/omarchy-trading/systemd/omarchy-trading-desk.{service,timer}
+systemctl --user enable --now omarchy-trading-desk.timer
+```
 
 Do not arm a `/desk-exit` loop. Hourly RISK is the only scheduled risk pass.
-
-Closing this chat stops the desk.
 
 ## Ledger files
 

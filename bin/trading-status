@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# JSON status for evo.trading Omarchy bar widget.
+set -euo pipefail
+
+_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_root="$(cd "${_bin_dir}/.." && pwd)"
+# shellcheck source=common.sh
+source "${_bin_dir}/common.sh"
+
+CACHE_KEY="trading-desk"
+TTL="${TRADING_STATUS_TTL:-60}"
+
+if cached=$(evo_bar_cache_read "$CACHE_KEY" "$TTL" 2>/dev/null); then
+  printf '%s\n' "$cached"
+  exit 0
+fi
+
+out="$("${_bin_dir}/bounded-run" python3 "${_root}/scripts/desk_status.py")" || {
+  jq -cn --arg msg "desk status failed" '{class:"error",ok:false,error:$msg,text:"",tooltip:"Desk"}'
+  exit 0
+}
+
+evo_bar_cache_write "$CACHE_KEY" <<<"$out" 2>/dev/null || true
+printf '%s\n' "$out"

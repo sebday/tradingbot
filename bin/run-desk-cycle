@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# One full LLM /desk-cycle via cursor-agent (hourly systemd or manual).
+set -euo pipefail
+
+_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_root="$(cd "${_bin_dir}/.." && pwd)"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/trading"
+log_file="${state_dir}/desk-cycle.log"
+meta_file="${state_dir}/last_run.json"
+lock_file="${XDG_RUNTIME_DIR:-/tmp}/omarchy-trading-desk.lock"
+
+mkdir -p -m 700 "$state_dir"
+umask 077
+
+utc_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+write_meta() {
+  local running_flag="${1:-0}" exit_code="${2:-}" err="${3:-}"
+  local running_json="false"
+  [[ "$running_flag" == "1" ]] && running_json="true"
+  jq -cn \
+    --arg started_at "${STARTED_AT}" \
+    --arg finished_at "${FINISHED_AT:-}" \
+    --argjson running "$running_json" \
+    --arg exit_code "${exit_code:-}" \
+    --arg error "${err:-}" \
+    '{started_at:$started_at,finished_at:$finished_at,running:$running,exit_code:$exit_code,error:$error}'
+}
+
+STARTED_AT="$(utc_now)"
+FINISHED_AT=""
+export STARTED_AT
+
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "desk cycle already running" >&2
+  exit 0
+fi
+
+write_meta 1 "" "" >"$meta_file"
+cd "$_root"
+
+set +e
+{
+  echo "=== desk-cycle ${STARTED_AT} ==="
+  command -v cursor-agent >/dev/null 2>&1 || command -v agent >/dev/null 2>&1
+} >>"$log_file" 2>&1
+
+agent_bin=""
+if command -v cursor-agent >/dev/null 2>&1; then
+  agent_bin="cursor-agent"
+elif command -v agent >/dev/null 2>&1; then
+  agent_bin="agent"
+fi
+
+if [[ -z "$agent_bin" ]]; then
+  FINISHED_AT="$(utc_now)"
+  write_meta 0 "127" "cursor-agent not found" >"$meta_file"
+  echo "cursor-agent not found" >>"$log_file"
+  exit 127
+fi
+
+/usr/bin/setsid -w /usr/bin/timeout -k 30 2700 "$agent_bin" -p --output-format text "/desk-cycle" >>"$log_file" 2>&1
+rc=$?
+set -e
+
+FINISHED_AT="$(utc_now)"
+if (( rc != 0 )); then
+  write_meta 0 "$rc" "desk-cycle exit $rc" >"$meta_file"
+  exit "$rc"
+fi
+
+write_meta 0 "0" "" >"$meta_file"
+exit 0

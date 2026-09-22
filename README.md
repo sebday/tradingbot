@@ -1,86 +1,58 @@
-# trading-desk
+# omarchy-trading
 
-Kraken-only desk in Cursor with Grok and Composer. SCAN only ranks online Kraken USD spot pairs. No xAI Grok Bot. No WorldMonitor UI.
+Live Kraken USD spot desk (agent-driven SCAN → VET → SIZE → FILLS → RISK) plus the **evo.trading** Omarchy bar widget.
 
-Sibling of `~/projects/worldmonitor` (unused as a server). This repo pulls the context feeds itself.
+## Omarchy bar
 
-## What it does
+- Bar: formatted **equity** (e.g. `$606`)
+- Panel: cash, pot, open positions, last cycle report, runner status
+- Actions: Refresh, **Run cycle** (full LLM `/desk-cycle`), Open desk (default agent in the centered terminal popup)
 
-CHIEF fans SCAN → VET → SIZE → FILLS, with RISK on Kraken OHLC. BOOK is skipped. A name without a Kraken `pair_id` never enters the list.
-
-When `paper` is false, FILLS and RISK call `scripts/kraken_execute.py` for live market orders. Seats never read `pass`.
-
-## Prerequisites
-
-- Python 3
-- Network to `api.kraken.com` public endpoints
-- For live fills: `pass` entries in `config.json` `kraken.passKey` / `passSecret`
-- Context: CNN Fear & Greed, alternative.me crypto F&G, Yahoo VIX, CoinPaprika (no keys)
-
-## Universe
+## Install plugin
 
 ```bash
-cd ~/projects/trading-desk
+omarchy plugin add /home/seb/projects/omarchy-trading
+# or symlink via hyprdots install.sh → ~/.config/omarchy/plugins/evo.trading
+omarchy plugin enable evo.trading
+```
+
+Add `evo.trading` to `shell.json` `plugins` and bar `layout` (see hyprdots).
+
+## Hourly LLM loop (no Cursor chat tab)
+
+```bash
+systemctl --user link ~/projects/omarchy-trading/systemd/omarchy-trading-desk.{service,timer}
+systemctl --user enable --now omarchy-trading-desk.timer
+```
+
+Each tick runs `bin/run-desk-cycle` → `cursor-agent -p "/desk-cycle"` (CHIEF + seats unchanged).
+
+Logs: `~/.local/state/omarchy/trading/desk-cycle.log`
+
+## Manual cycle
+
+Open this repo in Cursor and run `/desk-cycle`, or:
+
+```bash
+~/projects/omarchy-trading/bin/run-desk-cycle
+```
+
+## Scripts
+
+```bash
 python3 scripts/kraken_universe.py
-```
-
-Writes `ledger/universe-kraken.json`: online USD/ZUSD spot pairs, no `.d` dark pools.
-
-## Context
-
-```bash
 python3 scripts/desk_context.py
-```
-
-Writes `ledger/context.json`. SCAN may rerank existing Kraken pairs from those signals. VET uses them for STORY. Missing feeds mark SCAN `degraded`. Never `api.worldmonitor.app`.
-
-## Run the desk
-
-Open this folder in a Cursor agent chat and type `/desk-cycle`.
-
-CHIEF fans the seats, then arms a 60 minute `/loop`. RISK on each cycle checks volume and the peak trail on the open book. Optional manual `/desk-exit` exists; there is no second loop.
-
-Leave the chat open. Closing Cursor stops the desk.
-
-Existing Kraken balances are RISK's book. `maxFillsPerCycle` is 1.
-
-## Paper bank / live pot
-
-`bank.startingUsd` / `bank.allocatedUsd` is the pot. Live free cash is Kraken `usd_spot`. If equivalent equity falls to 50% of allocated (`risk.haltDrawdown`), `ledger/halt.json` is written and new fills stop until you clear it.
-
-Query-only live balance:
-
-```bash
 python3 scripts/kraken_balance.py
+python3 scripts/desk_status.py   # JSON for the bar
 ```
 
-The API key must allow Create & modify orders and Cancel; never Withdraw.
+## Config
 
-## Seats
+`config.json` — paper, Kelly, risk trail, Kraken `pass` key names (`kraken/trading-desk-key`).
 
-| Seat | Model | Owns |
-|------|-------|------|
-| CHIEF | inherit (this chat: Grok 4.7) | universe, fan-out, report |
-| SCAN | composer-2.5 | Kraken ticker ranking |
-| VET | inherit (this chat: Grok 4.7) | rejections |
-| BOOK | unused | SKIPPED_UNIVERSE |
-| SIZE | inherit (this chat: Grok 4.7) | dollars only |
-| FILLS | composer-2.5 | `kraken_execute.py buy` |
-| RISK | inherit (this chat: Grok 4.7) | hourly OHLC volume and trail, `kraken_execute.py sell` |
-
-## Dry-run tests
+## Tests
 
 ```bash
-cd ~/projects/trading-desk
+cd ~/projects/omarchy-trading
 python3 tests/test_dry_run.py
 ```
-
-Ticket math, halt floor, universe fetch, context fetch. Tests never call AddOrder.
-
-## Out of scope
-
-- Pump.fun / FOMO / Polymarket / Kalshi
-- Trading 212
-- Printing `pass` secrets
-- WorldMonitor Vite UI
-- `/make-bot-ui` operator panel (later)
