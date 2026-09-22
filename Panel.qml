@@ -168,7 +168,6 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    centerOnBar: true
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(420))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
@@ -343,84 +342,6 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             horizontalAlignment: Text.AlignHCenter
-          }
-
-          PanelSeparator {
-            visible: root.hasData && !!root.data.last_cycle
-            foreground: root.foreground
-          }
-
-          PanelSectionHeader {
-            visible: root.hasData && !!root.data.last_cycle
-            width: parent.width
-            text: "LAST CYCLE"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-          }
-
-          BorderSurface {
-            visible: root.hasData && !!root.data.last_cycle
-            width: parent.width
-            implicitHeight: cycleCol.implicitHeight + Style.space(20)
-            color: Color.popups.background
-            borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, 1)
-            radius: Style.cornerRadius
-
-            Column {
-              id: cycleCol
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.margins: Style.space(10)
-              spacing: Style.space(4)
-
-              Row {
-                width: parent.width
-                spacing: Style.space(8)
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: Model.plain(Model.clock(root.data.last_cycle && root.data.last_cycle.ts))
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: Model.plain(Model.cycleMode(root.data.last_cycle))
-                  color: root.data.last_cycle && root.data.last_cycle.degraded ? root.urgent : root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: true
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                text: Model.plain(Model.cycleStats(root.data.last_cycle))
-                color: root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                visible: text !== ""
-                text: Model.cycleNote(root.data.last_cycle)
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                wrapMode: Text.WordWrap
-                maximumLineCount: 4
-                elide: Text.ElideRight
-              }
-            }
           }
 
           Row {

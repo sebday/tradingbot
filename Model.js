@@ -108,18 +108,6 @@ function barTooltip(data, loading) {
   return plain(data.tooltip || "Kraken desk")
 }
 
-function cycleSummary(cycle) {
-  if (!cycle || typeof cycle !== "object") return "No cycle report yet"
-  var parts = []
-  if (cycle.ts) parts.push(String(cycle.ts))
-  if (cycle.equity_usd != null) parts.push("equity " + fmtUsd(cycle.equity_usd))
-  if (cycle.vet_pass != null) parts.push("vet " + cycle.vet_pass)
-  if (cycle.risk_closes != null && cycle.risk_closes > 0)
-    parts.push("closes " + cycle.risk_closes)
-  if (cycle.note) parts.push(plain(cycle.note, 280))
-  return parts.join(" · ")
-}
-
 function runnerLine(runner) {
   if (!runner || typeof runner !== "object") return "No cycle yet"
   if (runner.running) return "Cycle running"
@@ -158,30 +146,4 @@ function unrealizedUsd(positions) {
   }
   if (!any) return null
   return Math.round(sum * 100) / 100
-}
-
-function cycleMode(cycle) {
-  if (!cycle || typeof cycle !== "object") return ""
-  if (cycle.paper === true) return "Paper"
-  if (cycle.degraded === true) return "Degraded"
-  return "Live"
-}
-
-function cycleStats(cycle) {
-  if (!cycle || typeof cycle !== "object") return ""
-  var parts = []
-  var scan = cycle.scan != null ? cycle.scan : cycle.candidates
-  if (scan != null) parts.push("scan " + scan)
-  var vet = cycle.vet_pass != null ? cycle.vet_pass : cycle.passes
-  if (vet != null) parts.push("vet " + vet)
-  if (cycle.fills != null) parts.push("fills " + cycle.fills)
-  var closes = cycle.risk_closes != null ? cycle.risk_closes : cycle.closes
-  if (closes != null) parts.push("closes " + closes)
-  if (cycle.risk_holds != null) parts.push("holds " + cycle.risk_holds)
-  return parts.join(" · ")
-}
-
-function cycleNote(cycle) {
-  if (!cycle || typeof cycle !== "object") return ""
-  return plain(cycle.note || "", 280)
 }
