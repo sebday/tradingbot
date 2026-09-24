@@ -19,16 +19,14 @@ function fmtUsd(val) {
   if (isNaN(n)) return "—"
   var sign = n < 0 ? "-" : ""
   var abs = Math.abs(n)
-  if (abs >= 10000) {
-    var s = String(Math.round(abs))
-    var out = ""
-    for (var i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 === 0) out += ","
-      out += s.charAt(i)
-    }
-    return sign + "$" + out
+  if (abs < 1) return sign + "$" + abs.toFixed(2)
+  var rounded = String(Math.round(abs))
+  var out = ""
+  for (var i = 0; i < rounded.length; i++) {
+    if (i > 0 && (rounded.length - i) % 3 === 0) out += ","
+    out += rounded.charAt(i)
   }
-  return sign + "$" + abs.toFixed(2)
+  return sign + "$" + out
 }
 
 function fmtSignedUsd(val) {
@@ -99,12 +97,16 @@ function parsePayload(raw) {
 
 function barValue(data) {
   if (!data || !data.ok) return ""
+  if (data.equity_usd !== undefined && data.equity_usd !== null && data.equity_usd !== "")
+    return fmtUsd(data.equity_usd)
   return String(data.text || "")
 }
 
 function barTooltip(data, loading) {
   if (loading) return "Refreshing desk…"
   if (!data || !data.ok) return plain(data && data.error ? data.error : "Kraken desk")
+  if (data.equity_usd !== undefined && data.equity_usd !== null && data.equity_usd !== "")
+    return plain("Desk equity " + fmtUsd(data.equity_usd))
   return plain(data.tooltip || "Kraken desk")
 }
 

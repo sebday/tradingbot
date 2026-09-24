@@ -207,7 +207,8 @@ def main() -> int:
     if equity is not None:
         try:
             n = float(equity)
-            bar_text = f"${n:,.0f}" if n >= 1000 else f"${n:.2f}"
+            whole = int(round(abs(n)))
+            bar_text = f"-${whole:,}" if n < 0 else f"${whole:,}"
         except (TypeError, ValueError):
             bar_text = ""
 
