@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -15,8 +14,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import desk_halt  # noqa: E402
 import kraken_private as kp  # noqa: E402
 import kraken_universe as ku  # noqa: E402
+from desk_paths import ledger_dir  # noqa: E402
 
-LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
 CONFIG = json.loads((ROOT / "config.json").read_text())
 DUST_USD = 1.0
 
@@ -26,14 +25,14 @@ def utc_now() -> str:
 
 
 def append(name: str, row: dict) -> None:
-    path = LEDGER / name
+    path = ledger_dir() / name
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, separators=(",", ":")) + "\n")
 
 
 def load_jsonl(name: str) -> list[dict]:
-    path = LEDGER / name
+    path = ledger_dir() / name
     if not path.exists():
         return []
     rows = []

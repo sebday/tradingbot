@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-LEDGER = Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
+from desk_paths import ROOT, ledger_dir
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -240,8 +238,9 @@ def fetch_all() -> dict:
 
 
 def write_context(payload: dict) -> Path:
-    LEDGER.mkdir(parents=True, exist_ok=True)
-    path = LEDGER / "context.json"
+    ledger = ledger_dir()
+    ledger.mkdir(parents=True, exist_ok=True)
+    path = ledger / "context.json"
     path.write_text(json.dumps(payload, indent=2) + "\n")
     return path
 

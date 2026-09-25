@@ -4,6 +4,7 @@ set -euo pipefail
 
 _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _root="$(cd "${_bin_dir}/.." && pwd)"
+export TRADING_DESK_LEDGER="${TRADING_DESK_LEDGER:-${_root}/ledger}"
 # shellcheck source=common.sh
 source "${_bin_dir}/common.sh"
 

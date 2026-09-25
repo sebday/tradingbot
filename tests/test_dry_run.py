@@ -15,6 +15,7 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import desk_context  # noqa: E402
 import desk_halt  # noqa: E402
+import desk_paths  # noqa: E402
 import kraken_universe as ku  # noqa: E402
 
 FORBIDDEN = (
@@ -39,6 +40,14 @@ def load_jsonl(path: Path) -> list[dict]:
 
 
 class TicketAndRisk(unittest.TestCase):
+    def test_default_ledger_is_repo_not_state(self):
+        old = os.environ.pop("TRADING_DESK_LEDGER", None)
+        try:
+            self.assertEqual(desk_paths.ledger_dir(), ROOT / "ledger")
+        finally:
+            if old is not None:
+                os.environ["TRADING_DESK_LEDGER"] = old
+
     def test_min_ticket_uses_ordermin_times_last(self):
         need = ku.min_ticket_usd(
             {"last": 0.02, "ordermin": "600", "costmin": "0.5"}

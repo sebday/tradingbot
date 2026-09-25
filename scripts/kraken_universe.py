@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+from desk_paths import ROOT, ledger_dir
+
 KRAKEN = "https://api.kraken.com/0/public"
 UA = "trading-desk-paper/0.2"
-
-
-def ledger_dir() -> Path:
-    return Path(os.environ.get("TRADING_DESK_LEDGER") or Path.home() / ".local/state/omarchy/trading/ledger")
 
 
 def cache_path() -> Path:

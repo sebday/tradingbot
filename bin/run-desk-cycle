@@ -4,6 +4,7 @@ set -euo pipefail
 
 _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _root="$(cd "${_bin_dir}/.." && pwd)"
+export TRADING_DESK_LEDGER="${TRADING_DESK_LEDGER:-${_root}/ledger}"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/trading"
 log_file="${state_dir}/desk-cycle.log"
 meta_file="${state_dir}/last_run.json"

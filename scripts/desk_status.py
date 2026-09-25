@@ -13,14 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-STATE_DIR = Path.home() / ".local/state/omarchy/trading"
+from desk_paths import STATE_DIR, ledger_dir  # noqa: E402
+
 RUN_META = STATE_DIR / "last_run.json"
-
-
-def ledger_dir() -> Path:
-    import os
-
-    return Path(os.environ.get("TRADING_DESK_LEDGER") or STATE_DIR / "ledger")
 
 
 def _runtime_dir() -> Path:
