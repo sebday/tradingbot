@@ -18,7 +18,7 @@
     "allowMultiple": false,
     "defaultSection": "center",
     "defaults": {
-      "refreshIntervalSec": 60
+      "refreshIntervalSec": 300
     },
     "schema": [
       {
@@ -28,7 +28,7 @@
         "min": 30,
         "max": 600,
         "step": 30,
-        "defaultValue": 60
+        "defaultValue": 300
       }
     ]
   }

@@ -26,7 +26,7 @@ Panel {
 
   readonly property string statusScript: Qt.resolvedUrl("bin/trading-status").toString().replace("file://", "")
   readonly property string cycleScript: Qt.resolvedUrl("bin/run-desk-cycle").toString().replace("file://", "")
-  readonly property int refreshIntervalSec: Math.max(30, parseInt(setting("refreshIntervalSec", 60), 10) || 60)
+  readonly property int refreshIntervalSec: Math.max(30, parseInt(setting("refreshIntervalSec", 300), 10) || 300)
 
   property bool loading: true
   property var data: Model.emptyData("")
@@ -121,7 +121,7 @@ Panel {
   Timer {
     id: refreshTimer
     interval: root.refreshIntervalSec * 1000
-    running: root.opened
+    running: true
     repeat: true
     onTriggered: root.refresh()
   }
