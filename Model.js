@@ -95,11 +95,18 @@ function parsePayload(raw) {
   }
 }
 
+function deskIcon() {
+  return "\uf201"
+}
+
 function barValue(data) {
-  if (!data || !data.ok) return ""
+  var icon = deskIcon()
+  if (!data || !data.ok) return icon
   if (data.equity_usd !== undefined && data.equity_usd !== null && data.equity_usd !== "")
-    return fmtUsd(data.equity_usd)
-  return String(data.text || "")
+    return icon + " " + fmtUsd(data.equity_usd)
+  var text = plain(data.text, 32)
+  if (text) return icon + " " + text
+  return icon
 }
 
 function barTooltip(data, loading) {

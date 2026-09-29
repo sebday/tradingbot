@@ -37,6 +37,7 @@ Panel {
   readonly property bool iconBusy: loading
   readonly property bool iconMuted: false
   readonly property string barTooltip: Model.barTooltip(data, loading)
+  readonly property string deskIcon: Model.deskIcon()
   readonly property string barValue: Model.barValue(data)
   readonly property var allPositions: hasData && data.positions instanceof Array ? data.positions : []
   readonly property var positions: allPositions.length > 12 ? allPositions.slice(0, 12) : allPositions
@@ -230,7 +231,7 @@ Panel {
             iconComponent: Component {
               Text {
                 textFormat: Text.PlainText
-                text: ""
+                text: root.deskIcon
                 color: root.tone
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.display
