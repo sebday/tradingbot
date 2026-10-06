@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/projects/trading-bot
-ExecStart=%h/projects/trading-bot/bin/run-desk-cycle
+WorkingDirectory=%h/projects/tradingbot
+ExecStart=%h/projects/tradingbot/bin/run-desk-cycle
 TimeoutStartSec=45min
 
 [Install]
