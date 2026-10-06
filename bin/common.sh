@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared helpers for evo.trading bar scripts.
 
-EVO_BAR_CACHE_DIR="${EVO_BAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/omarchy/bar}"
+EVO_BAR_CACHE_DIR="${EVO_BAR_CACHE_DIR:-${EVOSHELL_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/evoshell}/trading}"
 
 evo_bar_cache_path() {
   printf '%s/%s.json' "$EVO_BAR_CACHE_DIR" "$1"

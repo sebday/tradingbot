@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """JSON status for evo.trading Omarchy bar widget. Read-only display."""
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _runtime_dir() -> Path:
 
 
 def lock_path() -> Path:
-    return _runtime_dir() / "omarchy-trading-desk.lock"
+    return _runtime_dir() / "evo-trading-desk.lock"
 
 
 def utc_now() -> str:

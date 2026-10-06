@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Dry-run tests: Kraken universe, ticket math, halt, context. No AddOrder."""
 from __future__ import annotations
 

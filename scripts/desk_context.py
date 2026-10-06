@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Desk context: CNN fear/greed, crypto F&G, VIX, CoinPaprika. No WorldMonitor UI."""
 from __future__ import annotations
 

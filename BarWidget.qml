@@ -1,6 +1,6 @@
 import QtQuick
-import qs.Commons
-import qs.Ui
+import qs.commons
+import qs.ui
 import "Model.js" as Model
 
 BarWidget {

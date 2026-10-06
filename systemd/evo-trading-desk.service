@@ -1,5 +1,5 @@
 [Unit]
-Description=Omarchy Kraken desk cycle (cursor-agent /desk-cycle)
+Description=Kraken desk cycle (cursor-agent /desk-cycle)
 After=network-online.target
 Wants=network-online.target
 

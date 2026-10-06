@@ -3,8 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import qs.Commons
-import qs.Ui
+import qs.commons
+import qs.ui
 import "Model.js" as Model
 
 Panel {
@@ -17,12 +17,12 @@ Panel {
   property var hostWidget: null
   readonly property var barIdentity: hostWidget || root
 
-  readonly property color foreground: Color.foreground
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
-  readonly property color accent: Color.accent
+  readonly property color foreground: Theme.foreground
+  readonly property color urgent: bar ? bar.urgent : Theme.urgent
+  readonly property color accent: Theme.accent
   readonly property color dim: Qt.darker(foreground, 1.4)
-  readonly property color surface: Color.popups.background
-  readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property color surface: Theme.popups.background
+  readonly property string fontFamily: bar ? bar.fontFamily : Theme.font.family
 
   readonly property string statusScript: Qt.resolvedUrl("bin/trading-status").toString().replace("file://", "")
   readonly property string cycleScript: Qt.resolvedUrl("bin/run-desk-cycle").toString().replace("file://", "")
@@ -86,17 +86,11 @@ Panel {
     var rootPath = hasData && data.desk_root ? String(data.desk_root) : ""
     if (rootPath.length < 2 || rootPath.charAt(0) !== "/" || rootPath.indexOf("\n") >= 0 || rootPath.indexOf("=") >= 0)
       return
-    // org.omarchy.terminal is the default centered floating popup.
     Quickshell.execDetached([
-      "/usr/bin/setsid",
-      "/usr/bin/uwsm-app",
-      "--",
-      "/usr/bin/xdg-terminal-exec",
-      "--app-id=org.omarchy.terminal",
+      "xdg-terminal-exec",
       "--dir=" + rootPath,
       "-e",
-      "/usr/share/omarchy/bin/omarchy-agent",
-      "--inline"
+      "cursor-agent"
     ])
     root.close()
   }
@@ -170,8 +164,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(420))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
+    contentWidth: panel.fittedContentWidth(Theme.space(420))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, Theme.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -193,7 +187,7 @@ Panel {
         Column {
           id: column
           width: panelFlick.width
-          spacing: Style.space(12)
+          spacing: Theme.space(12)
 
           Text {
             textFormat: Text.PlainText
@@ -202,7 +196,7 @@ Panel {
             text: "Refreshing desk…"
             color: root.foreground
             font.family: root.fontFamily
-            font.pixelSize: Style.font.body
+            font.pixelSize: Theme.font.body
             horizontalAlignment: Text.AlignHCenter
           }
 
@@ -213,7 +207,7 @@ Panel {
             text: Model.plain(root.data.error)
             color: root.urgent
             font.family: root.fontFamily
-            font.pixelSize: Style.font.body
+            font.pixelSize: Theme.font.body
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignHCenter
           }
@@ -234,7 +228,7 @@ Panel {
                 text: root.deskIcon
                 color: root.foreground
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.display
+                font.pixelSize: Theme.font.display
                 opacity: 0.92
               }
             }
@@ -243,8 +237,8 @@ Panel {
           Rectangle {
             visible: root.hasData && root.data.halted
             width: parent.width
-            implicitHeight: haltText.implicitHeight + Style.space(12)
-            radius: Style.cornerRadius
+            implicitHeight: haltText.implicitHeight + Theme.space(12)
+            radius: Theme.cornerRadius
             color: Qt.rgba(root.urgent.r, root.urgent.g, root.urgent.b, 0.14)
             border.width: 1
             border.color: Qt.rgba(root.urgent.r, root.urgent.g, root.urgent.b, 0.4)
@@ -256,7 +250,7 @@ Panel {
               text: "Halted — new fills are stopped"
               color: root.urgent
               font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
+              font.pixelSize: Theme.font.bodySmall
               font.bold: true
             }
           }
@@ -268,14 +262,14 @@ Panel {
             text: Model.plain(root.data.balance_error, 180)
             color: root.urgent
             font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: Theme.font.caption
             wrapMode: Text.WordWrap
           }
 
           Row {
             visible: root.hasData
             width: parent.width
-            spacing: Style.space(16)
+            spacing: Theme.space(16)
 
             StatTile {
               width: (parent.width - parent.spacing * 3) / 4
@@ -321,7 +315,7 @@ Panel {
             text: "Nothing open"
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
+            font.pixelSize: Theme.font.bodySmall
             horizontalAlignment: Text.AlignHCenter
           }
 
@@ -341,14 +335,14 @@ Panel {
             text: "+" + root.positionHidden + " more"
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: Theme.font.caption
             horizontalAlignment: Text.AlignHCenter
           }
 
           Row {
             id: actions
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Theme.space(8)
 
             readonly property int buttonCount: openDesk.visible ? 3 : 2
 
@@ -382,15 +376,15 @@ Panel {
     property string label: ""
     property color valueColor: root.foreground
 
-    implicitWidth: Style.space(108)
-    implicitHeight: Style.font.heading + Style.space(56)
+    implicitWidth: Theme.space(108)
+    implicitHeight: Theme.font.heading + Theme.space(56)
 
     Rectangle {
       id: frame
       anchors.fill: parent
       anchors.topMargin: legendChip.visible ? legendChip.height / 2 : 0
       color: "transparent"
-      radius: Style.space(8)
+      radius: Theme.space(8)
       border.width: 1
       border.color: Qt.rgba(root.dim.r, root.dim.g, root.dim.b, 0.9)
       antialiasing: true
@@ -398,45 +392,45 @@ Panel {
 
     Item {
       id: legendChip
-      x: Style.space(14)
+      x: Theme.space(14)
       y: 0
-      width: legendTextItem.implicitWidth + Style.space(8)
+      width: legendTextItem.implicitWidth + Theme.space(8)
       height: Math.max(1, legendTextItem.implicitHeight)
       visible: tile.label !== ""
 
       Rectangle {
         anchors.fill: parent
-        color: Color.popups.background
+        color: Theme.popups.background
       }
 
       Text {
         id: legendTextItem
-        x: Style.space(4)
+        x: Theme.space(4)
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: tile.label
         color: root.dim
         font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
+        font.pixelSize: Theme.font.caption
         font.bold: true
       }
     }
 
     Text {
       anchors.fill: frame
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
+      anchors.leftMargin: Theme.space(6)
+      anchors.rightMargin: Theme.space(6)
       textFormat: Text.PlainText
       text: tile.value
       color: tile.valueColor
       font.family: root.fontFamily
-      font.pixelSize: Style.font.display
+      font.pixelSize: Theme.font.display
       font.bold: true
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       elide: Text.ElideRight
       fontSizeMode: Text.HorizontalFit
-      minimumPixelSize: Style.font.caption
+      minimumPixelSize: Theme.font.caption
     }
   }
 
@@ -444,10 +438,10 @@ Panel {
     id: row
     property var pos: ({})
 
-    implicitHeight: posCol.implicitHeight + Style.space(16)
-    color: Color.popups.background
-    borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, 1)
-    radius: Style.cornerRadius
+    implicitHeight: posCol.implicitHeight + Theme.space(16)
+    color: Theme.popups.background
+    borderSpec: Border.surfaceSpec("popups", "border", Theme.popups.border, 1)
+    radius: Theme.cornerRadius
     clip: true
 
     Rectangle {
@@ -463,13 +457,13 @@ Panel {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(12)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(2)
+      anchors.leftMargin: Theme.space(12)
+      anchors.rightMargin: Theme.space(10)
+      spacing: Theme.space(2)
 
       Row {
         width: parent.width
-        spacing: Style.space(8)
+        spacing: Theme.space(8)
 
         Text {
           textFormat: Text.PlainText
@@ -477,7 +471,7 @@ Panel {
           text: Model.plain(row.pos && (row.pos.wsname || row.pos.pair_id))
           color: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: Theme.font.body
           font.bold: true
           elide: Text.ElideRight
         }
@@ -488,7 +482,7 @@ Panel {
           text: Model.plain(Model.fmtSignedUsd(row.pos && row.pos.pnl_usd))
           color: root.pnlColor(row.pos && row.pos.pnl_usd)
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: Theme.font.body
           font.bold: true
         }
       }
@@ -502,7 +496,7 @@ Panel {
           + "  ·  " + Model.fmtPct(row.pos && row.pos.pct_vs_entry))
         color: root.dim
         font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
+        font.pixelSize: Theme.font.caption
         elide: Text.ElideRight
       }
     }
@@ -514,8 +508,8 @@ Panel {
     property bool enabled: true
     signal clicked()
 
-    implicitHeight: buttonLabel.implicitHeight + Style.space(12)
-    radius: Style.cornerRadius
+    implicitHeight: buttonLabel.implicitHeight + Theme.space(12)
+    radius: Theme.cornerRadius
     color: buttonHit.containsMouse && enabled
       ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.18)
       : Qt.rgba(root.accent.r, root.accent.g, root.accent.b, enabled ? 0.10 : 0.04)
@@ -530,7 +524,7 @@ Panel {
       text: button.label
       color: button.enabled ? root.foreground : root.dim
       font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
+      font.pixelSize: Theme.font.bodySmall
       font.bold: true
     }
 

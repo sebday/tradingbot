@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Kraken spot universe: online pairs in the desk quote currency. No API key."""
 from __future__ import annotations
 

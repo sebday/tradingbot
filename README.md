@@ -11,7 +11,7 @@ Live Kraken USD spot desk (agent-driven SCAN → VET → SIZE → FILLS → RISK
 ## Install plugin
 
 ```bash
-omarchy plugin add /home/seb/projects/omarchy-trading
+omarchy plugin add /home/seb/projects/trading-bot
 # or symlink via hyprdots install.sh → ~/.config/omarchy/plugins/evo.trading
 omarchy plugin enable evo.trading
 ```
@@ -21,8 +21,8 @@ Add `evo.trading` to `shell.json` `plugins` and bar `layout` (see hyprdots).
 ## Hourly LLM loop (no Cursor chat tab)
 
 ```bash
-systemctl --user link ~/projects/omarchy-trading/systemd/omarchy-trading-desk.{service,timer}
-systemctl --user enable --now omarchy-trading-desk.timer
+systemctl --user link ~/projects/trading-bot/systemd/evo-trading-desk.{service,timer}
+systemctl --user enable --now evo-trading-desk.timer
 ```
 
 Each tick runs `bin/run-desk-cycle` → `cursor-agent -p "/desk-cycle"` (CHIEF + seats unchanged).
@@ -34,7 +34,7 @@ Logs: `~/.local/state/omarchy/trading/desk-cycle.log`
 Open this repo in Cursor and run `/desk-cycle`, or:
 
 ```bash
-~/projects/omarchy-trading/bin/run-desk-cycle
+~/projects/trading-bot/bin/run-desk-cycle
 ```
 
 ## Scripts
@@ -53,6 +53,6 @@ python3 scripts/desk_status.py   # JSON for the bar
 ## Tests
 
 ```bash
-cd ~/projects/omarchy-trading
+cd ~/projects/trading-bot
 python3 tests/test_dry_run.py
 ```

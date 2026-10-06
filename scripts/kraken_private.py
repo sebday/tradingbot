@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Kraken private REST: load keys from pass, never print them."""
 from __future__ import annotations
 

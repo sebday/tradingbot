@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Human halt: lose haltDrawdown of allocatedUsd, stop new fills, wait."""
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Query-only Kraken balance from pass. No orders. May trip the 50% human halt."""
 from __future__ import annotations
 

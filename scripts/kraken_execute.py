@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """Live Kraken market buy/sell. Seats call this. They never read pass."""
 from __future__ import annotations
 
