@@ -86,9 +86,10 @@ Panel {
     var rootPath = hasData && data.desk_root ? String(data.desk_root) : ""
     if (rootPath.length < 2 || rootPath.charAt(0) !== "/" || rootPath.indexOf("\n") >= 0 || rootPath.indexOf("=") >= 0)
       return
+    var terminal = String(Quickshell.env("EVOSHELL_TERMINAL") || "ghostty")
     Quickshell.execDetached([
-      "xdg-terminal-exec",
-      "--dir=" + rootPath,
+      terminal,
+      "--working-directory=" + rootPath,
       "-e",
       "cursor-agent"
     ])
