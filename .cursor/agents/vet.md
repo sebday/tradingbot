@@ -18,8 +18,12 @@ CHECKS IN ORDER, cheapest first, first failure ends the check.
 4. TICKET. A 6% Kelly ticket on free cash must clear max(costmin, ordermin * last).
    If it cannot: REJECT. A position you cannot leave at min size is not a position.
    Live free cash is Kraken usd_spot from kraken_balance.py when venues.fills is kraken.
-5. ALREADY PRICED. If the move you are reasoning from is already visible in pct_change,
-   there is nothing left to take: REJECT.
+5. DAY BAND. Read scan.dayMoveMin and scan.dayMoveMax from config.json.
+   Use the candidate pct_change. If it is missing, one public Ticker read, then the same test.
+   pct_change missing or <= dayMoveMin: REJECT, failed_check DAY_FLAT.
+   pct_change > dayMoveMax: REJECT, failed_check MOVE_SPENT.
+   A move inside the band is a long this desk is allowed to take.
+   Do not reject it because the move is visible.
 6. STORY, only if the candidate carries a world claim. Read ledger/context.json signals.
    A claim in exactly one place: REJECT. A claim you cannot verify: REJECT.
    No world claim: skip, that is not a failure.
@@ -34,4 +38,4 @@ evidence: {endpoint, quote}|null, checks_run: [...], checks_skipped: [...], why}
 
 Append to ~/projects/trading-bot/ledger/rejections.jsonl with ts and cycle_id.
 Empty PASS lists are valid. Never cite an endpoint you did not call.
-Never approve on momentum. Never invent a Kraken pair.
+The day band is the momentum gate. Never invent a Kraken pair.

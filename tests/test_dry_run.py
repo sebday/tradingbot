@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import desk_context  # noqa: E402
+import desk_exit_check  # noqa: E402
 import desk_halt  # noqa: E402
 import desk_paths  # noqa: E402
 import kraken_universe as ku  # noqa: E402
@@ -128,6 +129,10 @@ class DeskShape(unittest.TestCase):
         self.assertFalse(cfg["paper"])
         self.assertEqual(cfg["venues"]["scan"], "kraken")
         self.assertEqual(cfg["venues"]["fills"], "kraken")
+        self.assertNotIn("edgeMin", cfg)
+        self.assertEqual(cfg["scan"]["dayMoveMin"], 0)
+        self.assertEqual(cfg["scan"]["dayMoveMax"], 0.15)
+        self.assertEqual(cfg["risk"]["exitPollSeconds"], 300)
 
     def test_no_mechanical_cycle_script(self):
         self.assertFalse((SCRIPTS / "paper-cycle.py").exists())
@@ -268,6 +273,56 @@ class DeskShape(unittest.TestCase):
                 else:
                     os.environ["TRADING_DESK_LEDGER"] = old
             self.assertEqual(load_jsonl(Path(tmp) / "fills.jsonl"), [])
+
+
+class DayBandAndExit(unittest.TestCase):
+    def setUp(self):
+        self.cfg = json.loads((ROOT / "config.json").read_text())
+
+    def test_day_band_allows_an_up_day_inside_the_cap(self):
+        self.assertIsNone(desk_exit_check.day_move_failure(0.04, self.cfg))
+        self.assertIsNone(desk_exit_check.day_move_failure(0.15, self.cfg))
+
+    def test_day_band_rejects_flat_red_and_spent(self):
+        self.assertEqual(desk_exit_check.day_move_failure(0.0, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_exit_check.day_move_failure(-0.03, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_exit_check.day_move_failure(None, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_exit_check.day_move_failure(0.16, self.cfg), "MOVE_SPENT")
+
+    def test_armed_winner_ignores_dead_volume(self):
+        rule = desk_exit_check.exit_rule(100, 140, True, 120, 0.05, True, self.cfg)
+        self.assertIsNone(rule)
+
+    def test_armed_winner_closes_on_the_floor(self):
+        rule = desk_exit_check.exit_rule(100, 140, True, 112, 0.05, True, self.cfg)
+        self.assertEqual(rule, "TRAIL_PEAK")
+
+    def test_missing_last_does_not_volume_close_a_winner(self):
+        rule = desk_exit_check.exit_rule(100, 140, True, None, None, False, self.cfg)
+        self.assertIsNone(rule)
+
+    def test_unarmed_position_closes_on_dead_volume(self):
+        rule = desk_exit_check.exit_rule(100, 120, True, 110, 0.1, True, self.cfg)
+        self.assertEqual(rule, "VOLUME_6H")
+
+    def test_unarmed_position_holds_when_volume_is_alive(self):
+        rule = desk_exit_check.exit_rule(100, 120, True, 110, 0.8, True, self.cfg)
+        self.assertIsNone(rule)
+
+    def test_unknown_volume_closes_only_when_the_trail_is_not_armed(self):
+        rule = desk_exit_check.exit_rule(100, 110, True, 105, None, False, self.cfg)
+        self.assertEqual(rule, "VOLUME_6H")
+
+    def test_peak_requires_the_fill_hour(self):
+        fill = 1_700_000_000
+        hour = fill - (fill % 3600)
+        late = [[hour + 3600, 0, 9, 0, 0, 0, 1, 0]]
+        self.assertEqual(desk_exit_check.peak_since_fill(late, fill), (None, False))
+        covered = [
+            [hour, 0, 5, 0, 0, 0, 1, 0],
+            [hour + 3600, 0, 9, 0, 0, 0, 1, 0],
+        ]
+        self.assertEqual(desk_exit_check.peak_since_fill(covered, fill), (9.0, True))
 
 
 if __name__ == "__main__":

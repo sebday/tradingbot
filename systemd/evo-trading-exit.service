@@ -1,0 +1,13 @@
+[Unit]
+Description=Kraken desk exit check (public price, then sell)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/tradingbot
+ExecStart=%h/projects/tradingbot/bin/run-desk-exit
+TimeoutStartSec=2min
+
+[Install]
+WantedBy=default.target

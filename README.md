@@ -27,7 +27,18 @@ systemctl --user enable --now evo-trading-desk.timer
 
 Each tick runs `bin/run-desk-cycle` → `cursor-agent -p "/desk-cycle"` (CHIEF + seats unchanged).
 
-Logs: `~/.local/state/omarchy/trading/desk-cycle.log`
+Logs: `~/.local/state/evoshell/trading/desk-cycle.log`
+
+## Exit check
+
+While a position is open, a 5-minute timer sells on the trail, or on dead volume while the trail is not armed. A flat book does not call Kraken.
+
+```bash
+systemctl --user link ~/projects/tradingbot/systemd/evo-trading-exit.{service,timer}
+systemctl --user enable --now evo-trading-exit.timer
+```
+
+`bin/run-desk-exit` → `scripts/desk_exit_check.py` → `kraken_execute.py sell`.
 
 ## Manual cycle
 

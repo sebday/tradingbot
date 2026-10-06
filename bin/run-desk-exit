@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# One mechanical exit check. Public prices, then kraken_execute.py sell.
+set -euo pipefail
+
+_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_root="$(cd "${_bin_dir}/.." && pwd)"
+export TRADING_DESK_LEDGER="${TRADING_DESK_LEDGER:-${_root}/ledger}"
+
+exec python3 "${_root}/scripts/desk_exit_check.py"

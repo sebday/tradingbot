@@ -95,7 +95,7 @@ systemctl --user link ~/projects/trading-bot/systemd/omarchy-trading-desk.{servi
 systemctl --user enable --now omarchy-trading-desk.timer
 ```
 
-Do not arm a `/desk-exit` loop. Hourly RISK is the only scheduled risk pass.
+Do not arm a bash sleep loop. Open positions are also checked by `evo-trading-exit.timer` (`scripts/desk_exit_check.py`, every 5 minutes, public prices, then `kraken_execute.py sell`). Hourly RISK uses the same close rules. Do not disable that timer.
 
 ## Ledger files
 

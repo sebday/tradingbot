@@ -22,7 +22,6 @@
     "maxFillsPerCycle": 1,
     "oflags": "viqc,fciq"
   },
-  "edgeMin": 0.08,
   "fee": {
     "rate": 0.004
   },
@@ -32,6 +31,7 @@
     "trailGiveback": 0.2,
     "trailFloorPct": 0.1,
     "pollSeconds": 3600,
+    "exitPollSeconds": 300,
     "ohlcInterval": 60,
     "haltDrawdown": 0.5,
     "haltUntilHuman": true
@@ -40,7 +40,9 @@
     "pollSeconds": 3600,
     "maxCandidates": 10,
     "volume24hMin": 100000,
-    "maxSpread": 0.004
+    "maxSpread": 0.004,
+    "dayMoveMin": 0,
+    "dayMoveMax": 0.15
   },
   "models": {
     "chief": "inherit",

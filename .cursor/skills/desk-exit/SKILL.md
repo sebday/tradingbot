@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Desk exit (manual)
 
-Optional. The repeating desk is **only** `/desk-cycle` every 60 minutes. That cycle's RISK seat owns volume and trail closes on the full hourly book read.
+Optional manual check. The scheduled exit is `evo-trading-exit.timer` → `scripts/desk_exit_check.py` every 5 minutes. `/desk-cycle` RISK uses the same rules once an hour. Run this skill only when a human wants an extra look.
 
 Run this skill only when a human explicitly asks for an extra exit check between hours.
 
@@ -37,7 +37,7 @@ Use the last known live book: pair_id, wsname, qty, entry (filled USD / base qty
 
 Task `generalPurpose`, model `composer-2.5`. Follow `~/projects/trading-bot/.cursor/agents/risk.md` EXIT CHECK.
 
-Public OHLC interval 60 and the public ticker last. Volume rule first, then TRAIL_PEAK. One full sell, never a trim.
+Public OHLC interval 60 and the public ticker last. A trail-armed winner closes only on TRAIL_PEAK. VOLUME_6H closes only while the peak is still under +30%. One full sell, never a trim.
 
 If neither rule fires, RISK stops. No private call.
 

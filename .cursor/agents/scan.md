@@ -25,7 +25,9 @@ spread = (ask - bid) / mid
 pct_change = (last - open) / open
 - Liquidity below config scan.volume24hMin never enters the list.
 - Spread above config scan.maxSpread never enters the list.
-- Rank on |pct_change| * volume_24h_quote, then trades_24h. Rate of change, not absolute size.
+- This desk only buys. pct_change <= scan.dayMoveMin never enters the list. Flat or red is not a long.
+- pct_change > scan.dayMoveMax never enters the list. A day already up more than that has spent the move.
+- Rank on volume_24h_quote, then trades_24h. The day's move is a gate, not the score.
 - Price climbing with collapsing trade count is a warning. Mark it, never rank it up.
 
 CONTEXT (optional)

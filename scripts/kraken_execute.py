@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -183,8 +185,29 @@ def merged_open(pair_id: str) -> dict | None:
     }
 
 
+def _sell_lock_path() -> Path:
+    rd = os.environ.get("XDG_RUNTIME_DIR")
+    base = Path(rd) if rd else Path.home() / ".cache"
+    return base / "evo-trading-sell.lock"
+
+
 def cmd_sell(args: argparse.Namespace) -> int:
     require_live()
+    lock_path = _sell_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = lock_path.open("a", encoding="utf-8")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        if (args.pair, "kraken") in closed_keys():
+            print(json.dumps({"skipped": "already_closed", "pair_id": args.pair}))
+            return 0
+        return _cmd_sell_locked(args)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+
+
+def _cmd_sell_locked(args: argparse.Namespace) -> int:
     universe = ku.load_universe()
     index = ku.pair_index(universe)
     meta = index.get(args.pair) or {}
@@ -253,12 +276,21 @@ def cmd_opens(_args: argparse.Namespace) -> int:
                 "filled_usd": 0.0,
                 "volume_base": 0.0,
                 "n": 0,
+                "first_ts": None,
             },
         )
         slot["filled_usd"] += float(row.get("filled") or 0)
         slot["volume_base"] += float(row.get("volume_base") or 0)
         slot["n"] += 1
-    print(json.dumps({"venue": venue, "paper": paper_mode(), "opens": list(by_pair.values())}, indent=2))
+        ts = row.get("ts")
+        if ts and (slot["first_ts"] is None or str(ts) < str(slot["first_ts"])):
+            slot["first_ts"] = ts
+    opens_out = []
+    for slot in by_pair.values():
+        qty = float(slot["volume_base"] or 0)
+        slot["entry"] = (slot["filled_usd"] / qty) if qty else 0.0
+        opens_out.append(slot)
+    print(json.dumps({"venue": venue, "paper": paper_mode(), "opens": opens_out}, indent=2))
     return 0
 
 

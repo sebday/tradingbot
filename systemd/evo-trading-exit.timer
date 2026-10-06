@@ -1,0 +1,11 @@
+[Unit]
+Description=Kraken desk exit check every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
