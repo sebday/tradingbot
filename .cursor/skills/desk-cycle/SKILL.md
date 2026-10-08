@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Desk cycle
 
-Run one cycle of the trading desk in `~/projects/trading-bot`. Universe is Kraken USD spot. Models come from `config.json`.
+Run one cycle of the trading desk in `~/projects/tradingbot`. Universe is Kraken USD spot. Models come from `config.json`.
 
 This skill is the desk. Do not run a Python cycle in place of the seats.
 
@@ -37,7 +37,7 @@ If `paper` is true, FILLS writes ledger rows and does not call execute.
 ### 1. Universe
 
 ```bash
-python3 ~/projects/trading-bot/scripts/kraken_universe.py
+python3 ~/projects/tradingbot/scripts/kraken_universe.py
 ```
 
 If this fails, stop. Read `ledger/universe-kraken.json`. SCAN may only rank those `pair_id`s.
@@ -45,7 +45,7 @@ If this fails, stop. Read `ledger/universe-kraken.json`. SCAN may only rank thos
 ### 2. Context
 
 ```bash
-python3 ~/projects/trading-bot/scripts/desk_context.py
+python3 ~/projects/tradingbot/scripts/desk_context.py
 ```
 
 Writes `ledger/context.json` (CNN Fear & Greed, crypto F&G, Yahoo VIX, CoinPaprika). A missing Yahoo VIX stays in `errors` and does not set `degraded`. CNN, crypto F&G, or CoinPaprika missing still sets `degraded`. Unavailable, or a missing file, marks SCAN `degraded` and the cycle continues. Never use prediction markets. Never call `api.worldmonitor.app`.
@@ -53,8 +53,8 @@ Writes `ledger/context.json` (CNN Fear & Greed, crypto F&G, Yahoo VIX, CoinPapri
 If live, also:
 
 ```bash
-python3 ~/projects/trading-bot/scripts/kraken_balance.py
-python3 ~/projects/trading-bot/scripts/kraken_execute.py opens
+python3 ~/projects/tradingbot/scripts/kraken_balance.py
+python3 ~/projects/tradingbot/scripts/kraken_execute.py opens
 ```
 
 Pass `usd_spot` / leftover assets / open pair_ids to SIZE and RISK.
@@ -91,7 +91,7 @@ After the report, do **not** arm `AGENT_LOOP_TICK_desk-cycle`. Do not start a ba
 If the timer is not enabled, tell the human:
 
 ```bash
-systemctl --user link ~/projects/trading-bot/systemd/omarchy-trading-desk.{service,timer}
+systemctl --user link ~/projects/tradingbot/systemd/omarchy-trading-desk.{service,timer}
 systemctl --user enable --now omarchy-trading-desk.timer
 ```
 

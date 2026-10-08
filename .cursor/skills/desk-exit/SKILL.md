@@ -35,7 +35,7 @@ Use the last known live book: pair_id, wsname, qty, entry (filled USD / base qty
 
 ### 2. RISK
 
-Task `generalPurpose`, model `composer-2.5`. Follow `~/projects/trading-bot/.cursor/agents/risk.md` EXIT CHECK.
+Task `generalPurpose`, model `composer-2.5`. Follow `~/projects/tradingbot/.cursor/agents/risk.md` EXIT CHECK.
 
 Public OHLC interval 60 and the public ticker last. A trail-armed winner closes only on TRAIL_PEAK. VOLUME_6H closes only while the peak is still under +30%. One full sell, never a trim.
 
@@ -44,7 +44,7 @@ If neither rule fires, RISK stops. No private call.
 If one fires, RISK calls `kraken_balance.py` once, then:
 
 ```bash
-python3 ~/projects/trading-bot/scripts/kraken_execute.py sell \
+python3 ~/projects/tradingbot/scripts/kraken_execute.py sell \
   --pair <pair_id> --wsname <wsname> --cycle-id <cycle_id> \
   --rule VOLUME_6H --volume-base <qty>
 ```
