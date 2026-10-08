@@ -13,8 +13,8 @@
     "lockedUsd": 0
   },
   "kraken": {
-    "passKey": "kraken/trading-desk-key",
-    "passSecret": "kraken/trading-desk-secret"
+    "passKey": "evoshell/kraken/trading-desk-key",
+    "passSecret": "evoshell/kraken/trading-desk-secret"
   },
   "kellyCap": 0.06,
   "maxOpenBooks": 7,

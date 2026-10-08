@@ -46,8 +46,8 @@ def pass_show(entry: str) -> str:
 
 def load_keys(cfg: dict) -> tuple[str, str]:
     kraken = cfg.get("kraken") or {}
-    key_entry = kraken.get("passKey") or "evoshell/kraken/api-key"
-    secret_entry = kraken.get("passSecret") or "evoshell/kraken/api-secret"
+    key_entry = kraken.get("passKey") or "evoshell/kraken/panel-key"
+    secret_entry = kraken.get("passSecret") or "evoshell/kraken/panel-secret"
     return pass_show(key_entry), pass_show(secret_entry)
 
 

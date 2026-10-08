@@ -59,7 +59,7 @@ python3 scripts/desk_status.py   # JSON for the bar
 
 ## Config
 
-`config.json` — paper, Kelly, risk trail, Kraken `pass` key names (`kraken/trading-desk-key`).
+`config.json` — paper, Kelly, risk trail, Kraken `pass` key names (`evoshell/kraken/trading-desk-key`).
 
 ## Tests
 
