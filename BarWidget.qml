@@ -76,8 +76,12 @@ BarWidget {
     dimmed: root.iconMuted && !root.iconError
     tooltipText: Model.plain(root.tooltip)
 
-    onPressed: function() {
+    onPressed: function(b) {
       if (!root.bar) return
+      if (b === Qt.MiddleButton) {
+        if (panelLoader.item && panelLoader.item.openDesk) panelLoader.item.openDesk()
+        return
+      }
       root.togglePanel()
     }
   }

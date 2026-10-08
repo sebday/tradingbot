@@ -6,7 +6,7 @@ Live Kraken USD spot desk (agent-driven SCAN → VET → SIZE → FILLS → RISK
 
 - Bar: chart mark plus formatted **equity** (e.g. ` $606`). The mark stays up before the first quote.
 - Panel: cash, pot, open positions, last cycle report, runner status
-- Actions: Refresh, **Run cycle** (full LLM `/desk-cycle`), Open desk (default agent in the centered terminal popup)
+- Middle-click the bar icon to open the desk in the terminal
 
 ## Install plugin
 

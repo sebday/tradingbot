@@ -128,10 +128,10 @@ function runnerLine(runner) {
   return "No cycle yet"
 }
 
-function deskBadge(data, cycleRunning) {
+function deskBadge(data) {
   if (!data || data.ok !== true) return ""
   if (data.halted) return "Halted"
-  if (cycleRunning || (data.runner && data.runner.running)) return "Running"
+  if (data.runner && data.runner.running) return "Running"
   if (data.runner && data.runner.stale) return "Stale"
   if (data.last_cycle && data.last_cycle.paper === true) return "Paper"
   return "Live"

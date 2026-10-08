@@ -25,12 +25,10 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Theme.font.family
 
   readonly property string statusScript: Qt.resolvedUrl("bin/trading-status").toString().replace("file://", "")
-  readonly property string cycleScript: Qt.resolvedUrl("bin/run-desk-cycle").toString().replace("file://", "")
   readonly property int refreshIntervalSec: Math.max(30, parseInt(setting("refreshIntervalSec", 300), 10) || 300)
 
   property bool loading: true
   property var data: Model.emptyData("")
-  property bool cycleRunning: false
 
   readonly property bool hasData: data.ok === true
   readonly property bool iconError: !loading && !hasData && data.error !== ""
@@ -45,12 +43,32 @@ Panel {
   readonly property var positions: allPositions.length > 12 ? allPositions.slice(0, 12) : allPositions
   readonly property int positionHidden: Math.max(0, allPositions.length - positions.length)
   readonly property var unrealized: Model.unrealizedUsd(allPositions)
-  readonly property string badge: Model.deskBadge(data, cycleRunning)
+  readonly property string badge: Model.deskBadge(data)
+  readonly property real pairColWidth: columnWidth(pairMetrics, positions, function(p) {
+    return Model.plain(p && (p.wsname || p.pair_id))
+  })
+  readonly property real lastColWidth: columnWidth(detailMetrics, positions, function(p) {
+    return Model.fmtUsd(p && p.last)
+  })
+  readonly property real entryColWidth: columnWidth(detailMetrics, positions, function(p) {
+    return Model.fmtUsd(p && p.entry)
+  })
+  readonly property real pctColWidth: columnWidth(detailMetrics, positions, function(p) {
+    return Model.fmtPct(p && p.pct_vs_entry)
+  })
   readonly property color tone: {
     if (iconError || (hasData && data.halted)) return urgent
     var n = parseFloat(unrealized)
     if (isNaN(n) || n === 0) return foreground
     return n > 0 ? accent : urgent
+  }
+
+  function columnWidth(metrics, list, pick) {
+    var max = 0
+    var rows = list || []
+    for (var i = 0; i < rows.length; i++)
+      max = Math.max(max, metrics.advanceWidth(pick(rows[i])))
+    return Math.ceil(max)
   }
 
   function pnlColor(val) {
@@ -77,13 +95,6 @@ Panel {
     statusProc.running = true
   }
 
-  function runCycleNow() {
-    if (!cycleScript || cycleProc.running) return
-    cycleRunning = true
-    cycleProc.command = ["bash", cycleScript]
-    cycleProc.running = true
-  }
-
   function openDesk() {
     var rootPath = hasData && data.desk_root ? String(data.desk_root) : ""
     if (rootPath.length < 2 || rootPath.charAt(0) !== "/" || rootPath.indexOf("\n") >= 0 || rootPath.indexOf("=") >= 0)
@@ -108,6 +119,19 @@ Panel {
     else root.openFromHotkey()
   }
 
+
+  FontMetrics {
+    id: pairMetrics
+    font.family: root.fontFamily
+    font.pixelSize: Theme.font.body
+    font.bold: true
+  }
+
+  FontMetrics {
+    id: detailMetrics
+    font.family: root.fontFamily
+    font.pixelSize: Theme.font.caption
+  }
 
   Component.onCompleted: refresh()
 
@@ -140,15 +164,6 @@ Panel {
     }
     onExited: function() {
       root.applyPayload(String(stdoutBuf || "").trim())
-    }
-  }
-
-  Process {
-    id: cycleProc
-    onStarted: { }
-    onExited: function() {
-      root.cycleRunning = false
-      root.refresh()
     }
   }
 
@@ -343,32 +358,6 @@ Panel {
             horizontalAlignment: Text.AlignHCenter
           }
 
-          Row {
-            id: actions
-            width: parent.width
-            spacing: Theme.space(8)
-
-            readonly property int buttonCount: openDesk.visible ? 3 : 2
-
-            ActionButton {
-              width: (parent.width - parent.spacing * (actions.buttonCount - 1)) / actions.buttonCount
-              label: "Refresh"
-              onClicked: root.refresh()
-            }
-            ActionButton {
-              width: (parent.width - parent.spacing * (actions.buttonCount - 1)) / actions.buttonCount
-              label: root.cycleRunning ? "Running…" : "Run cycle"
-              enabled: !root.cycleRunning
-              onClicked: root.runCycleNow()
-            }
-            ActionButton {
-              id: openDesk
-              width: (parent.width - parent.spacing * (actions.buttonCount - 1)) / actions.buttonCount
-              visible: root.hasData && !!root.data.desk_root
-              label: "Open desk"
-              onClicked: root.openDesk()
-            }
-          }
         }
       }
     }
@@ -442,7 +431,7 @@ Panel {
     id: row
     property var pos: ({})
 
-    implicitHeight: posCol.implicitHeight + Theme.space(16)
+    implicitHeight: posLine.implicitHeight + Theme.space(16)
     color: Theme.popups.background
     borderSpec: Border.surfaceSpec("popups", "border", Theme.popups.border, 1)
     radius: Theme.cornerRadius
@@ -456,89 +445,114 @@ Panel {
       color: root.pnlColor(row.pos && row.pos.pnl_usd)
     }
 
-    Column {
-      id: posCol
+    Item {
+      id: posLine
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       anchors.leftMargin: Theme.space(12)
       anchors.rightMargin: Theme.space(10)
-      spacing: Theme.space(2)
+      implicitHeight: Math.max(pairText.implicitHeight, detailRow.implicitHeight, pnlText.implicitHeight)
+
+      Text {
+        id: pairText
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        width: root.pairColWidth
+        textFormat: Text.PlainText
+        text: Model.plain(row.pos && (row.pos.wsname || row.pos.pair_id))
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Theme.font.body
+        font.bold: true
+        elide: Text.ElideRight
+      }
 
       Row {
-        width: parent.width
+        id: detailRow
+        anchors.left: pairText.right
+        anchors.leftMargin: Theme.space(10)
+        anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.space(8)
 
-        Text {
-          textFormat: Text.PlainText
-          width: parent.width - pnlText.implicitWidth - parent.spacing
-          text: Model.plain(row.pos && (row.pos.wsname || row.pos.pair_id))
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Theme.font.body
-          font.bold: true
-          elide: Text.ElideRight
+        Row {
+          spacing: Theme.space(4)
+          Text {
+            textFormat: Text.PlainText
+            text: "Last"
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Theme.font.caption
+          }
+          Text {
+            width: root.lastColWidth
+            horizontalAlignment: Text.AlignRight
+            textFormat: Text.PlainText
+            text: Model.plain(Model.fmtUsd(row.pos && row.pos.last))
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Theme.font.caption
+          }
         }
 
         Text {
-          id: pnlText
           textFormat: Text.PlainText
-          text: Model.plain(Model.fmtSignedUsd(row.pos && row.pos.pnl_usd))
-          color: root.pnlColor(row.pos && row.pos.pnl_usd)
+          text: "·"
+          color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Theme.font.body
-          font.bold: true
+          font.pixelSize: Theme.font.caption
+        }
+
+        Row {
+          spacing: Theme.space(4)
+          Text {
+            textFormat: Text.PlainText
+            text: "entry"
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Theme.font.caption
+          }
+          Text {
+            width: root.entryColWidth
+            horizontalAlignment: Text.AlignRight
+            textFormat: Text.PlainText
+            text: Model.plain(Model.fmtUsd(row.pos && row.pos.entry))
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Theme.font.caption
+          }
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          text: "·"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Theme.font.caption
+        }
+
+        Text {
+          width: root.pctColWidth
+          horizontalAlignment: Text.AlignRight
+          textFormat: Text.PlainText
+          text: Model.plain(Model.fmtPct(row.pos && row.pos.pct_vs_entry))
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Theme.font.caption
         }
       }
 
       Text {
+        id: pnlText
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        width: parent.width
-        text: Model.plain(
-          "Last " + Model.fmtUsd(row.pos && row.pos.last)
-          + "  ·  entry " + Model.fmtUsd(row.pos && row.pos.entry)
-          + "  ·  " + Model.fmtPct(row.pos && row.pos.pct_vs_entry))
-        color: root.dim
+        text: Model.plain(Model.fmtSignedUsd(row.pos && row.pos.pnl_usd))
+        color: root.pnlColor(row.pos && row.pos.pnl_usd)
         font.family: root.fontFamily
-        font.pixelSize: Theme.font.caption
-        elide: Text.ElideRight
+        font.pixelSize: Theme.font.body
+        font.bold: true
       }
-    }
-  }
-
-  component ActionButton: Rectangle {
-    id: button
-    property string label: ""
-    property bool enabled: true
-    signal clicked()
-
-    implicitHeight: buttonLabel.implicitHeight + Theme.space(12)
-    radius: Theme.cornerRadius
-    color: buttonHit.containsMouse && enabled
-      ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.18)
-      : Qt.rgba(root.accent.r, root.accent.g, root.accent.b, enabled ? 0.10 : 0.04)
-    border.width: 1
-    border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, enabled ? 0.35 : 0.12)
-    opacity: enabled ? 1 : 0.7
-
-    Text {
-      id: buttonLabel
-      textFormat: Text.PlainText
-      anchors.centerIn: parent
-      text: button.label
-      color: button.enabled ? root.foreground : root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Theme.font.bodySmall
-      font.bold: true
-    }
-
-    MouseArea {
-      id: buttonHit
-      anchors.fill: parent
-      enabled: button.enabled
-      hoverEnabled: true
-      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onClicked: button.clicked()
     }
   }
 }
