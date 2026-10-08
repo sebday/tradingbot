@@ -38,6 +38,8 @@ Panel {
   readonly property bool iconMuted: false
   readonly property string barTooltip: Model.barTooltip(data, loading)
   readonly property string deskIcon: Model.deskIcon()
+  readonly property string barAmount: Model.barAmount(data)
+  readonly property string barIcon: barAmount !== "" ? deskIcon : ""
   readonly property string barValue: Model.barValue(data)
   readonly property var allPositions: hasData && data.positions instanceof Array ? data.positions : []
   readonly property var positions: allPositions.length > 12 ? allPositions.slice(0, 12) : allPositions

@@ -39,6 +39,8 @@ BarWidget {
   readonly property bool iconMuted: panelLoader.item ? panelLoader.item.iconMuted === true : false
   readonly property string tooltip: panelLoader.item ? panelLoader.item.barTooltip : "Kraken desk"
   readonly property string valueText: panelLoader.item ? panelLoader.item.barValue : ""
+  readonly property string iconText: panelLoader.item ? (panelLoader.item.barIcon || "") : ""
+  readonly property string amountText: panelLoader.item ? (panelLoader.item.barAmount || "") : ""
   readonly property real openPanelIndicatorWidth: button.labelWidth
 
   visible: valueText !== "" || iconBusy || iconError
@@ -65,7 +67,8 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.valueText
+    text: root.iconText !== "" ? root.amountText : root.valueText
+    leadingIcon: root.iconText
     hasVisualContent: root.valueText !== "" || root.iconBusy
     horizontalMargin: 8.75
     active: root.iconError

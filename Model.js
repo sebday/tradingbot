@@ -99,14 +99,17 @@ function deskIcon() {
   return "\uf201"
 }
 
-function barValue(data) {
-  var icon = deskIcon()
-  if (!data || !data.ok) return icon
+function barAmount(data) {
+  if (!data || !data.ok) return ""
   if (data.equity_usd !== undefined && data.equity_usd !== null && data.equity_usd !== "")
-    return icon + " " + fmtUsd(data.equity_usd)
-  var text = plain(data.text, 32)
-  if (text) return icon + " " + text
-  return icon
+    return fmtUsd(data.equity_usd)
+  return plain(data.text, 32)
+}
+
+function barValue(data) {
+  var amount = barAmount(data)
+  if (amount) return deskIcon() + " " + amount
+  return deskIcon()
 }
 
 function barTooltip(data, loading) {
