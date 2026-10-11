@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Daily candles for one open position. Public Kraken OHLC, no API key.
+set -euo pipefail
+
+_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_root="$(cd "${_bin_dir}/.." && pwd)"
+
+pair="${1:-}"
+days="${2:-30}"
+
+if [[ ! "$pair" =~ ^[A-Za-z0-9]{2,20}$ ]]; then
+  jq -cn --arg pair "$pair" '{ok:false,error:"Bad pair",pair_id:$pair,bars:[]}'
+  exit 0
+fi
+
+if [[ ! "$days" =~ ^[0-9]+$ ]]; then
+  days=30
+fi
+
+exec "${_bin_dir}/bounded-run" python3 "${_root}/scripts/pair_candles.py" "$pair" "$days"

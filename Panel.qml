@@ -25,10 +25,16 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Theme.font.family
 
   readonly property string statusScript: Qt.resolvedUrl("bin/trading-status").toString().replace("file://", "")
+  readonly property string candlesScript: Qt.resolvedUrl("bin/pair-candles").toString().replace("file://", "")
   readonly property int refreshIntervalSec: Math.max(30, parseInt(setting("refreshIntervalSec", 300), 10) || 300)
+  readonly property int chartHistoryDays: 30
+  readonly property int chartBlockHeight: 112
 
   property bool loading: true
   property var data: Model.emptyData("")
+  property string expandedPair: ""
+  property string candleLoadingPair: ""
+  property var candleBars: ({})
 
   readonly property bool hasData: data.ok === true
   readonly property bool iconError: !loading && !hasData && data.error !== ""
@@ -109,6 +115,60 @@ Panel {
     root.close()
   }
 
+  function togglePosition(pairId) {
+    var id = String(pairId || "")
+    if (!id) return
+    if (expandedPair === id) {
+      expandedPair = ""
+      return
+    }
+    expandedPair = id
+    var cached = candleBars && candleBars[id]
+    if (!cached || cached.error)
+      startCandleFetch(id)
+  }
+
+  function storeCandles(pairId, entry) {
+    var next = ({})
+    var current = candleBars || ({})
+    for (var key in current)
+      next[key] = current[key]
+    next[String(pairId)] = entry
+    candleBars = next
+  }
+
+  function applyCandles(pairId, raw) {
+    if (candleLoadingPair === pairId)
+      candleLoadingPair = ""
+    var bars = []
+    var error = ""
+    try {
+      var parsed = JSON.parse(String(raw || ""))
+      if (parsed && parsed.ok && Array.isArray(parsed.bars))
+        bars = parsed.bars
+      else
+        error = parsed && parsed.error ? String(parsed.error) : "No chart data"
+    } catch (e) {
+      error = "No chart data"
+    }
+    storeCandles(pairId, { bars: bars, error: error })
+  }
+
+  function startCandleFetch(pairId) {
+    var id = String(pairId || "")
+    if (!id || !candlesScript) return
+    candleLoadingPair = id
+    if (candleProc.running) {
+      candleProc.queuedPair = id
+      return
+    }
+    candleProc.pairId = id
+    candleProc.queuedPair = ""
+    candleProc.stdoutBuf = ""
+    candleProc.command = ["bash", candlesScript, id, String(chartHistoryDays)]
+    candleProc.running = true
+  }
+
   function openFromHotkey() {
     root.controller.show()
     root.refresh()
@@ -164,6 +224,34 @@ Panel {
     }
     onExited: function() {
       root.applyPayload(String(stdoutBuf || "").trim())
+    }
+  }
+
+  Process {
+    id: candleProc
+    property string stdoutBuf: ""
+    property string pairId: ""
+    property string queuedPair: ""
+    onStarted: stdoutBuf = ""
+    stdout: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        candleProc.stdoutBuf += chunk
+        if (candleProc.stdoutBuf.length > 262144) {
+          candleProc.signal(15)
+          candleProc.stdoutBuf = ""
+        }
+      }
+    }
+    onExited: function() {
+      var pair = pairId
+      var raw = String(stdoutBuf || "").trim()
+      if (pair)
+        root.applyCandles(pair, raw)
+      var next = queuedPair
+      queuedPair = ""
+      if (next && next !== pair)
+        root.startCandleFetch(next)
     }
   }
 
@@ -430,8 +518,17 @@ Panel {
   component PositionRow: BorderSurface {
     id: row
     property var pos: ({})
+    readonly property string pairId: String(pos && pos.pair_id || "")
+    readonly property bool expanded: pairId !== "" && root.expandedPair === pairId
+    readonly property var chartEntry: {
+      var cache = root.candleBars || ({})
+      return cache[pairId] || null
+    }
+    readonly property var bars: chartEntry && chartEntry.bars ? chartEntry.bars : []
+    readonly property string chartError: chartEntry && chartEntry.error ? String(chartEntry.error) : ""
+    readonly property bool chartLoading: root.candleLoadingPair === pairId && !chartEntry
 
-    implicitHeight: posLine.implicitHeight + Theme.space(16)
+    implicitHeight: body.implicitHeight + Theme.space(16)
     color: Theme.popups.background
     borderSpec: Border.surfaceSpec("popups", "border", Theme.popups.border, 1)
     radius: Theme.cornerRadius
@@ -445,14 +542,20 @@ Panel {
       color: root.pnlColor(row.pos && row.pos.pnl_usd)
     }
 
-    Item {
-      id: posLine
+    Column {
+      id: body
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.top: parent.top
       anchors.leftMargin: Theme.space(12)
       anchors.rightMargin: Theme.space(10)
-      implicitHeight: Math.max(pairText.implicitHeight, detailRow.implicitHeight, pnlText.implicitHeight)
+      anchors.topMargin: Theme.space(8)
+      spacing: row.expanded ? Theme.space(8) : 0
+
+      Item {
+        id: posLine
+        width: parent.width
+        implicitHeight: Math.max(pairText.implicitHeight, detailRow.implicitHeight, pnlText.implicitHeight)
 
       Text {
         id: pairText
@@ -553,6 +656,42 @@ Panel {
         font.pixelSize: Theme.font.body
         font.bold: true
       }
+      }
+
+      Item {
+        width: parent.width
+        implicitHeight: row.expanded ? root.chartBlockHeight : 0
+        height: implicitHeight
+        visible: implicitHeight > 0
+        clip: true
+
+        SparklineChart {
+          anchors.fill: parent
+          style: "candlestick"
+          bullishColor: root.accent
+          bearishColor: root.urgent
+          chartHeight: root.chartBlockHeight
+          bars: row.bars
+          showEmptyLabel: false
+          opacity: row.bars.length > 0 ? 1 : 0.18
+        }
+
+        Text {
+          anchors.centerIn: parent
+          visible: row.bars.length === 0
+          textFormat: Text.PlainText
+          text: row.chartLoading ? "…" : (row.chartError || "No chart data")
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Theme.font.caption
+        }
+      }
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.togglePosition(row.pairId)
     }
   }
 }
