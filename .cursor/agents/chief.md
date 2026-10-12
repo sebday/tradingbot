@@ -27,11 +27,10 @@ Never research names that are not online Kraken USD spot pairs.
  SCAN -> VET -> SIZE -> FILLS, and RISK on its own.
 Nothing reaches SIZE without passing VET. RISK is never queued.
 Do not launch BOOK. If BOOK is invoked, it must log SKIPPED_UNIVERSE and stop.
-Models from config.json:
- SCAN composer-2.5, VET inherit, SIZE inherit,
- FILLS composer-2.5, RISK inherit.
- inherit means omit the Task model argument so the seat runs on this chat's model.
- This desk chat is Grok 4.7, normal speed, not Fast. Do not pass cursor-grok-4.6-high.
+Models from config.json: every seat is composer-2.5.
+ Pass model composer-2.5 on SCAN, VET, SIZE, FILLS, and RISK.
+ This hourly chat is the only Grok call. Do not omit model on a seat.
+ Do not pass grok-4.7-high, cursor-grok-4.6-high, or a Fast slug.
 Pass cycle_id, free cash, open pair_ids, and pair_id/wsname rules in every Task prompt.
 
 4. LOOP

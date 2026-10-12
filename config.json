@@ -47,11 +47,11 @@
   "models": {
     "chief": "inherit",
     "scan": "composer-2.5",
-    "vet": "inherit",
-    "book": "inherit",
-    "size": "inherit",
+    "vet": "composer-2.5",
+    "book": "composer-2.5",
+    "size": "composer-2.5",
     "fills": "composer-2.5",
-    "risk": "inherit",
+    "risk": "composer-2.5",
     "exit": "composer-2.5"
   }
 }
