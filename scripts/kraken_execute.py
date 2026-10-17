@@ -78,6 +78,18 @@ def closed_keys() -> set[tuple[str, str]]:
     return out
 
 
+def net_base_open(pair_id: str, venue: str) -> float:
+    """Filled base minus closed base; re-entry after a full close stays sellable."""
+    vol = 0.0
+    for row in load_jsonl("fills.jsonl"):
+        if row.get("pair_id") == pair_id and (row.get("venue") or "paper") == venue:
+            vol += float(row.get("volume_base") or 0)
+    for row in load_jsonl("closes.jsonl"):
+        if row.get("pair_id") == pair_id and (row.get("venue") or "paper") == venue and is_close_row(row):
+            vol -= float(row.get("volume_base") or 0)
+    return max(0.0, vol)
+
+
 def open_fills(venue: str) -> list[dict]:
     closed = closed_keys()
     opens = []
@@ -198,7 +210,7 @@ def cmd_sell(args: argparse.Namespace) -> int:
     lock_fd = lock_path.open("a", encoding="utf-8")
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        if (args.pair, "kraken") in closed_keys():
+        if net_base_open(args.pair, "kraken") <= 0:
             print(json.dumps({"skipped": "already_closed", "pair_id": args.pair}))
             return 0
         return _cmd_sell_locked(args)
