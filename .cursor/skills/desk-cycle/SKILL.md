@@ -84,15 +84,15 @@ Empty PASS lists are valid.
 Hourly automation is **not** a Cursor chat tab. The `evo.trading` plugin ships:
 
 - `bin/run-desk-cycle` — one `cursor-agent -p "/desk-cycle"` with flock
-- `systemd --user` timer `omarchy-trading-desk.timer` (every 3600s, on boot)
+- `systemd --user` timer `evo-trading-desk.timer` (hourly, `OnCalendar=hourly`)
 
 After the report, do **not** arm `AGENT_LOOP_TICK_desk-cycle`. Do not start a bash sleep loop in a terminal.
 
 If the timer is not enabled, tell the human:
 
 ```bash
-systemctl --user link ~/projects/tradingbot/systemd/omarchy-trading-desk.{service,timer}
-systemctl --user enable --now omarchy-trading-desk.timer
+systemctl --user link ~/projects/tradingbot/systemd/evo-trading-desk.{service,timer}
+systemctl --user enable --now evo-trading-desk.timer
 ```
 
 Do not arm a bash sleep loop. Open positions are also checked by `evo-trading-exit.timer` (`scripts/desk_exit_check.py`, every 5 minutes, public prices, then `kraken_execute.py sell`). Hourly RISK uses the same close rules. Do not disable that timer.

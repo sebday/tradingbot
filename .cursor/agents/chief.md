@@ -35,7 +35,7 @@ Pass cycle_id, free cash, open pair_ids, and pair_id/wsname rules in every Task 
 
 4. LOOP
  /desk-cycle is the repeating desk. Hourly wakes come from systemd
- (omarchy-trading-desk.timer) running bin/run-desk-cycle → cursor-agent -p "/desk-cycle".
+ (evo-trading-desk.timer) running bin/run-desk-cycle → cursor-agent -p "/desk-cycle".
  Do not arm AGENT_LOOP_TICK_desk-cycle or a bash sleep loop in a Cursor terminal.
  Do not replace the seats with a script. Entries stay on this hourly cycle.
  Exits are also checked every 5 minutes by evo-trading-exit.timer → scripts/desk_exit_check.py.

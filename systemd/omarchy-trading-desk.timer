@@ -2,8 +2,8 @@
 Description=Hourly Kraken desk cycle
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=3600
+OnCalendar=hourly
+AccuracySec=1min
 Persistent=true
 
 [Install]

@@ -21,6 +21,8 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Theme.urgent
   readonly property color accent: Theme.accent
   readonly property color dim: Qt.darker(foreground, 1.4)
+  property color themeGreen: Theme.ansiFallback("green")
+  property color themeRed: Theme.ansiFallback("red")
   readonly property color surface: Theme.popups.background
   readonly property string fontFamily: bar ? bar.fontFamily : Theme.font.family
 
@@ -37,7 +39,16 @@ Panel {
   property var candleBars: ({})
 
   readonly property bool hasData: data.ok === true
-  readonly property bool iconError: !loading && !hasData && data.error !== ""
+  readonly property bool deskDown: {
+    if (loading && !hasData) return false
+    if (!hasData || data.halted) return true
+    var runner = data.runner || {}
+    if (runner.running) return false
+    if (runner.stale || runner.error) return true
+    var code = String(runner.exit_code == null ? "" : runner.exit_code)
+    return code !== "" && code !== "0"
+  }
+  readonly property bool iconError: deskDown
   readonly property bool iconBusy: loading
   readonly property bool iconMuted: false
   readonly property string barTooltip: Model.barTooltip(data, loading)
@@ -50,6 +61,18 @@ Panel {
   readonly property int positionHidden: Math.max(0, allPositions.length - positions.length)
   readonly property var unrealized: Model.unrealizedUsd(allPositions)
   readonly property string badge: Model.deskBadge(data)
+  readonly property color badgeColor: deskDown ? themeRed : themeGreen
+
+  function loadThemeColors(raw) {
+    var found = {}
+    var lines = String(raw || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var match = lines[i].match(/^\s*(green|red|color1|color2)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
+      if (match) found[match[1]] = match[2]
+    }
+    themeGreen = found.green || found.color2 || Theme.ansiFallback("green")
+    themeRed = found.red || found.color1 || Theme.ansiFallback("red")
+  }
   readonly property real pairColWidth: columnWidth(pairMetrics, positions, function(p) {
     return Model.plain(p && (p.wsname || p.pair_id))
   })
@@ -179,6 +202,20 @@ Panel {
     else root.openFromHotkey()
   }
 
+  FileView {
+    id: themeColorsFile
+    path: Theme.currentThemePath + "/colors.toml"
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.loadThemeColors(text())
+  }
+
+  Connections {
+    target: Theme
+    function onThemeDataChanged() { themeColorsFile.reload() }
+    function onForegroundChanged() { themeColorsFile.reload() }
+    function onAccentChanged() { themeColorsFile.reload() }
+  }
 
   FontMetrics {
     id: pairMetrics
@@ -325,6 +362,7 @@ Panel {
             title: Model.plain(Model.fmtUsd(root.data.equity_usd))
             meta: Model.plain(Model.heroMeta(root.data))
             detail: Model.plain(root.badge)
+            detailColor: root.badgeColor
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconOpacity: root.loading ? 0.55 : 1
