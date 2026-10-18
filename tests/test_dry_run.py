@@ -506,9 +506,10 @@ class EntryGuards(unittest.TestCase):
         self.assertAlmostEqual(dollars, 15.0)
 
     def test_exposure_cap_blocks_new_tickets(self):
-        self.assertEqual(desk_rules.ticket_usd(486, 164, 322, 5, self.cfg), (0.0, "EXPOSURE_CAP"))
-        self.assertEqual(desk_rules.ticket_usd(500, 300, 245, 5, self.cfg), (0.0, "EXPOSURE_CAP"))
-        self.assertEqual(desk_rules.ticket_usd(500, 300, 235, 5, self.cfg), (15.0, None))
+        cfg = {**self.cfg, "entry": {**self.cfg["entry"], "maxExposurePct": 0.5}}
+        self.assertEqual(desk_rules.ticket_usd(486, 164, 322, 5, cfg), (0.0, "EXPOSURE_CAP"))
+        self.assertEqual(desk_rules.ticket_usd(500, 300, 245, 5, cfg), (0.0, "EXPOSURE_CAP"))
+        self.assertEqual(desk_rules.ticket_usd(500, 300, 235, 5, cfg), (15.0, None))
 
     def test_ticket_floor_skips_dust_buys(self):
         self.assertEqual(desk_rules.ticket_usd(100, 100, 0, 5, self.cfg), (0.0, "TICKET_FLOOR"))

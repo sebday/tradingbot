@@ -25,7 +25,7 @@
     "enabled": true,
     "ticketPctEquity": 0.06,
     "minTicketUsd": 10,
-    "maxExposurePct": 0.5,
+    "maxExposurePct": 0.8,
     "maxNewPerDay": 3,
     "reentryCooldownHours": 24,
     "maxSlippageBps": 40,
