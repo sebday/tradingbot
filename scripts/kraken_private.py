@@ -108,13 +108,22 @@ def add_order(
     volume: str,
     oflags: str | None = None,
     validate: bool = False,
+    ordertype: str = "market",
+    price: str | None = None,
+    timeinforce: str | None = None,
 ) -> dict[str, Any]:
     extra = {
         "pair": pair,
         "type": side,
-        "ordertype": "market",
+        "ordertype": ordertype,
         "volume": volume,
     }
+    if ordertype == "limit":
+        if not price:
+            raise ValueError("limit order needs a price")
+        extra["price"] = price
+    if timeinforce:
+        extra["timeinforce"] = timeinforce
     if oflags:
         extra["oflags"] = oflags
     if validate:

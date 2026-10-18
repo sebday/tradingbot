@@ -116,19 +116,14 @@ def main() -> int:
     floor = desk_halt.halt_floor_usd(config)
     halted = desk_halt.is_halted()
 
-    opens_payload: dict = {"opens": []}
+    import desk_book  # noqa: E402
+
+    venue = "paper" if config.get("paper") else (config.get("venues") or {}).get("fills") or "paper"
     try:
-        proc = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/kraken_execute.py"), "opens"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=str(ROOT),
-        )
-        if proc.returncode == 0 and proc.stdout.strip():
-            opens_payload = json.loads(proc.stdout)
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
-        pass
+        book = desk_book.load_book(venue)
+        opens = [p.to_dict() for p in desk_book.managed_positions(book)]
+    except OSError:
+        opens = []
 
     equity = None
     usd_spot = None
@@ -151,7 +146,6 @@ def main() -> int:
     except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
         balance_err = str(e)[:200]
 
-    opens = opens_payload.get("opens") or []
     pair_ids = [str(o.get("pair_id")) for o in opens if o.get("pair_id")]
     lasts = fetch_tickers(pair_ids)
 
@@ -177,6 +171,9 @@ def main() -> int:
                 "last": last,
                 "pnl_usd": pnl,
                 "pct_vs_entry": pct,
+                "stop_price": round(entry * (1.0 - float((config.get("risk") or {}).get("stopLossPct", 0.08))), 8)
+                if entry
+                else None,
             }
         )
 

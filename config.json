@@ -16,16 +16,27 @@
     "passKey": "evoshell/kraken/trading-desk-key",
     "passSecret": "evoshell/kraken/trading-desk-secret"
   },
-  "kellyCap": 0.06,
   "maxOpenBooks": 7,
   "live": {
     "maxFillsPerCycle": 1,
-    "oflags": "viqc,fciq"
+    "buyOflags": "fciq"
+  },
+  "entry": {
+    "enabled": true,
+    "ticketPctEquity": 0.06,
+    "minTicketUsd": 10,
+    "maxExposurePct": 0.5,
+    "maxNewPerDay": 3,
+    "reentryCooldownHours": 24,
+    "maxSlippageBps": 40,
+    "vetTimeoutSeconds": 600
   },
   "fee": {
     "rate": 0.004
   },
   "risk": {
+    "stopLossPct": 0.08,
+    "staleAlertMinutes": 30,
     "volumeRatioClose": 0.2,
     "trailArmPct": 0.3,
     "trailGiveback": 0.2,
@@ -42,16 +53,14 @@
     "volume24hMin": 100000,
     "maxSpread": 0.004,
     "dayMoveMin": 0,
-    "dayMoveMax": 0.15
+    "dayMoveMax": 0.15,
+    "minRange24h": 0.01,
+    "excludeBases": [
+      "USDT", "USDC", "DAI", "PYUSD", "USDG", "RLUSD", "USDS", "USDE", "FDUSD", "TUSD", "USDQ", "USDR",
+      "EURC", "EURQ", "EURR", "EUR", "GBP", "AUD", "CAD", "CHF", "JPY"
+    ]
   },
   "models": {
-    "chief": "inherit",
-    "scan": "composer-2.5",
-    "vet": "composer-2.5",
-    "book": "composer-2.5",
-    "size": "composer-2.5",
-    "fills": "composer-2.5",
-    "risk": "composer-2.5",
-    "exit": "composer-2.5"
+    "vet": "composer-2.5"
   }
 }

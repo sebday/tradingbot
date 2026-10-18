@@ -1,5 +1,9 @@
 #!/usr/bin/python3 -I
-"""Live Kraken market buy/sell. Seats call this. They never read pass."""
+"""Live Kraken buy/sell. The only AddOrder on the desk. Never prints secrets.
+
+Buys are limit IOC at ask + entry.maxSlippageBps and refuse to add to a held
+pair. Sells are market so a stop always fills.
+"""
 from __future__ import annotations
 
 import argparse
@@ -13,7 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+import desk_book  # noqa: E402
 import desk_halt  # noqa: E402
+import desk_rules  # noqa: E402
 import kraken_private as kp  # noqa: E402
 import kraken_universe as ku  # noqa: E402
 from desk_paths import ledger_dir  # noqa: E402
@@ -33,17 +39,6 @@ def append(name: str, row: dict) -> None:
         f.write(json.dumps(row, separators=(",", ":")) + "\n")
 
 
-def load_jsonl(name: str) -> list[dict]:
-    path = ledger_dir() / name
-    if not path.exists():
-        return []
-    rows = []
-    for line in path.read_text().splitlines():
-        if line.strip():
-            rows.append(json.loads(line))
-    return rows
-
-
 def paper_mode() -> bool:
     return bool(CONFIG.get("paper"))
 
@@ -52,53 +47,6 @@ def fills_venue() -> str:
     if paper_mode():
         return "paper"
     return (CONFIG.get("venues") or {}).get("fills") or "paper"
-
-
-def is_close_row(row: dict) -> bool:
-    """HOLD notes live in closes.jsonl too. Only a real sell removes the book."""
-    action = str(row.get("action") or "").upper()
-    if action == "HOLD":
-        return False
-    if action == "CLOSE":
-        return True
-    status = str(row.get("status") or "").lower()
-    if status == "open":
-        return False
-    if status == "closed":
-        return True
-    return action == "" and status == ""
-
-
-def closed_keys() -> set[tuple[str, str]]:
-    out: set[tuple[str, str]] = set()
-    for row in load_jsonl("closes.jsonl"):
-        pair_id = row.get("pair_id")
-        if pair_id and is_close_row(row):
-            out.add((pair_id, row.get("venue") or "paper"))
-    return out
-
-
-def net_base_open(pair_id: str, venue: str) -> float:
-    """Filled base minus closed base; re-entry after a full close stays sellable."""
-    vol = 0.0
-    for row in load_jsonl("fills.jsonl"):
-        if row.get("pair_id") == pair_id and (row.get("venue") or "paper") == venue:
-            vol += float(row.get("volume_base") or 0)
-    for row in load_jsonl("closes.jsonl"):
-        if row.get("pair_id") == pair_id and (row.get("venue") or "paper") == venue and is_close_row(row):
-            vol -= float(row.get("volume_base") or 0)
-    return max(0.0, vol)
-
-
-def open_fills(venue: str) -> list[dict]:
-    closed = closed_keys()
-    opens = []
-    for row in load_jsonl("fills.jsonl"):
-        pair_id = row.get("pair_id")
-        fill_venue = row.get("venue") or "paper"
-        if pair_id and fill_venue == venue and (pair_id, fill_venue) not in closed:
-            opens.append(row)
-    return opens
 
 
 def wait_order(key: str, secret: str, txid: str) -> dict:
@@ -120,29 +68,47 @@ def require_live() -> None:
 
 def cycle_fill_count(cycle_id: str) -> int:
     n = 0
-    for row in load_jsonl("fills.jsonl"):
+    for row in desk_book.load_jsonl(ledger_dir() / "fills.jsonl"):
         if row.get("cycle_id") == cycle_id and (row.get("venue") or "paper") == "kraken":
             n += 1
     return n
 
 
+def fail(payload: dict, code: int) -> int:
+    print(json.dumps(payload), file=sys.stderr)
+    return code
+
+
 def cmd_buy(args: argparse.Namespace) -> int:
     require_live()
     if desk_halt.is_halted():
-        print(json.dumps({"error": "HALTED", "fills": 0}), file=sys.stderr)
-        return 2
+        return fail({"error": "HALTED", "fills": 0}, 2)
     max_per = int((CONFIG.get("live") or {}).get("maxFillsPerCycle") or 1)
     if cycle_fill_count(args.cycle_id) >= max_per:
-        print(json.dumps({"error": "maxFillsPerCycle", "max": max_per}), file=sys.stderr)
-        return 1
+        return fail({"error": "maxFillsPerCycle", "max": max_per}, 1)
     dollars = float(args.dollars)
     if dollars <= 0:
-        print(json.dumps({"error": "dollars must be > 0"}), file=sys.stderr)
-        return 1
+        return fail({"error": "dollars must be > 0"}, 1)
+    block = desk_rules.entry_block(args.pair, desk_book.load_book("kraken"), CONFIG, time.time())
+    if block:
+        return fail({"error": block, "pair_id": args.pair}, 3)
+
+    meta = ku.pair_index(ku.load_universe()).get(args.pair)
+    if not meta:
+        return fail({"error": "pair not in universe", "pair_id": args.pair}, 1)
+    tick = ku.fetch_tickers([args.pair]).get(args.pair)
+    if not tick or not tick.get("ask"):
+        return fail({"error": "no ask", "pair_id": args.pair}, 1)
+    ask = float(tick["ask"])
+    limit = desk_rules.limit_buy_price(ask, CONFIG)
+    price = ku.round_price(limit, meta.get("pair_decimals"))
+    volume = ku.round_base(dollars / float(price), meta.get("lot_decimals"))
+    if float(volume) < float(meta.get("ordermin") or 0):
+        return fail({"error": "below ordermin", "volume": volume, "ordermin": meta.get("ordermin")}, 1)
+
     key, secret = kp.load_keys(CONFIG)
     try:
-        volume = ku.round_quote_usd(dollars)
-        oflags = ((CONFIG.get("live") or {}).get("oflags")) or "viqc,fciq"
+        oflags = (CONFIG.get("live") or {}).get("buyOflags") or "fciq"
         result = kp.add_order(
             key,
             secret,
@@ -150,6 +116,9 @@ def cmd_buy(args: argparse.Namespace) -> int:
             side="buy",
             volume=volume,
             oflags=oflags,
+            ordertype="limit",
+            price=price,
+            timeinforce="IOC",
             validate=False,
         )
         txids = result.get("txid") or []
@@ -157,26 +126,36 @@ def cmd_buy(args: argparse.Namespace) -> int:
         info = wait_order(key, secret, txid) if txid else {}
     finally:
         del key, secret
-    last = float(args.decision_price or 0)
-    fill_px = float(info.get("price") or last or 0)
-    cost = float(info.get("cost") or volume)
-    slip = 0 if not last else int(round((fill_px - last) / last * 10000))
+
+    vol_exec = float(info.get("vol_exec") or 0)
+    if vol_exec <= 0:
+        return fail(
+            {"unfilled": True, "pair_id": args.pair, "limit_price": price, "ask": ask, "txid": txid,
+             "status": info.get("status")},
+            4,
+        )
+    decision = float(args.decision_price or 0) or ask
+    fill_px = float(info.get("price") or 0) or float(price)
+    cost = float(info.get("cost") or vol_exec * fill_px)
     row = {
         "ts": utc_now(),
         "cycle_id": args.cycle_id,
         "pair_id": args.pair,
-        "wsname": args.wsname or "",
+        "wsname": args.wsname or meta.get("wsname") or "",
         "requested": round(dollars, 2),
         "filled": round(cost, 2),
-        "decision_price": last or None,
+        "decision_price": decision,
+        "ask": ask,
+        "limit_price": float(price),
+        "order_type": "limit_ioc",
         "fill_price": fill_px,
-        "slippage_bps": slip,
+        "slippage_bps": int(round((fill_px - decision) / decision * 10000)),
         "fee_percent": float((CONFIG.get("fee") or {}).get("rate") or 0),
         "fee_usd": float(info.get("fee") or 0),
-        "partial": bool(info.get("status") and str(info.get("status")).lower() != "closed"),
+        "partial": vol_exec < float(volume) * 0.999,
         "venue": "kraken",
         "txid": txid,
-        "volume_base": float(info.get("vol_exec") or 0),
+        "volume_base": vol_exec,
         "descr": (result.get("descr") or {}).get("order"),
     }
     append("fills.jsonl", row)
@@ -184,23 +163,18 @@ def cmd_buy(args: argparse.Namespace) -> int:
     return 0
 
 
-def merged_open(pair_id: str) -> dict | None:
-    same = [p for p in open_fills("kraken") if p["pair_id"] == pair_id]
-    if not same:
-        return None
-    qty = sum(float(p.get("volume_base") or 0) for p in same)
-    return {
-        "pair_id": pair_id,
-        "wsname": same[0].get("wsname") or "",
-        "volume_base": qty,
-        "fills": same,
-    }
-
-
 def _sell_lock_path() -> Path:
     rd = os.environ.get("XDG_RUNTIME_DIR")
     base = Path(rd) if rd else Path.home() / ".cache"
     return base / "evo-trading-sell.lock"
+
+
+def managed_position(pair_id: str) -> desk_book.Position | None:
+    book = desk_book.load_book("kraken")
+    for pos in desk_book.managed_positions(book):
+        if pos.pair_id == pair_id:
+            return pos
+    return None
 
 
 def cmd_sell(args: argparse.Namespace) -> int:
@@ -210,30 +184,23 @@ def cmd_sell(args: argparse.Namespace) -> int:
     lock_fd = lock_path.open("a", encoding="utf-8")
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        if net_base_open(args.pair, "kraken") <= 0:
+        pos = managed_position(args.pair)
+        if pos is None:
             print(json.dumps({"skipped": "already_closed", "pair_id": args.pair}))
             return 0
-        return _cmd_sell_locked(args)
+        return _cmd_sell_locked(args, pos)
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         lock_fd.close()
 
 
-def _cmd_sell_locked(args: argparse.Namespace) -> int:
-    universe = ku.load_universe()
-    index = ku.pair_index(universe)
-    meta = index.get(args.pair) or {}
-    pos = merged_open(args.pair)
-    qty = float(args.volume_base or 0)
-    if qty <= 0 and pos:
-        qty = float(pos["volume_base"] or 0)
+def _cmd_sell_locked(args: argparse.Namespace, pos: desk_book.Position) -> int:
+    meta = ku.pair_index(ku.load_universe()).get(args.pair) or {}
+    qty = float(args.volume_base or 0) or pos.qty
     if qty <= 0:
-        print(json.dumps({"error": "missing volume_base", "pair_id": args.pair}), file=sys.stderr)
-        return 1
-    last = None
+        return fail({"error": "missing volume_base", "pair_id": args.pair}, 1)
     ticks = ku.fetch_tickers([args.pair])
-    if args.pair in ticks:
-        last = ticks[args.pair].get("last")
+    last = (ticks.get(args.pair) or {}).get("last")
     if last and qty * float(last) < DUST_USD:
         print(json.dumps({"skipped": "dust", "pair_id": args.pair, "notional": qty * float(last)}))
         return 0
@@ -254,60 +221,44 @@ def _cmd_sell_locked(args: argparse.Namespace) -> int:
         info = wait_order(key, secret, txid) if txid else {}
     finally:
         del key, secret
+    status = str(info.get("status") or "").lower()
+    vol_exec = float(info.get("vol_exec") or 0)
+    executed = bool(txid) and (vol_exec > 0 or status in {"open", "pending", ""})
     row = {
         "ts": utc_now(),
         "cycle_id": args.cycle_id,
         "pair_id": args.pair,
-        "wsname": args.wsname or (pos or {}).get("wsname") or "",
-        "action": "CLOSE",
+        "wsname": args.wsname or pos.wsname,
+        "action": "CLOSE" if executed else "SELL_FAILED",
         "rule_fired": args.rule or "MANUAL",
         "venue": "kraken",
         "txid": txid,
+        "entry": pos.entry,
+        "opened_ts": pos.opened_ts,
         "fill_price": float(info.get("price") or 0),
         "filled": float(info.get("cost") or 0),
-        "volume_base": float(info.get("vol_exec") or qty),
+        "volume_base": vol_exec or float(volume),
         "status": info.get("status"),
     }
     append("closes.jsonl", row)
     print(json.dumps(row, indent=2))
-    return 0
+    return 0 if executed else 1
 
 
 def cmd_opens(_args: argparse.Namespace) -> int:
     venue = fills_venue()
-    opens = open_fills(venue)
-    by_pair: dict[str, dict] = {}
-    for row in opens:
-        pid = row["pair_id"]
-        slot = by_pair.setdefault(
-            pid,
-            {
-                "pair_id": pid,
-                "wsname": row.get("wsname"),
-                "venue": venue,
-                "filled_usd": 0.0,
-                "volume_base": 0.0,
-                "n": 0,
-                "first_ts": None,
-            },
-        )
-        slot["filled_usd"] += float(row.get("filled") or 0)
-        slot["volume_base"] += float(row.get("volume_base") or 0)
-        slot["n"] += 1
-        ts = row.get("ts")
-        if ts and (slot["first_ts"] is None or str(ts) < str(slot["first_ts"])):
-            slot["first_ts"] = ts
+    book = desk_book.load_book(venue)
     opens_out = []
-    for slot in by_pair.values():
-        qty = float(slot["volume_base"] or 0)
-        slot["entry"] = (slot["filled_usd"] / qty) if qty else 0.0
-        opens_out.append(slot)
+    for pos in book.open_positions():
+        row = pos.to_dict()
+        row["n"] = pos.n_buys
+        opens_out.append(row)
     print(json.dumps({"venue": venue, "paper": paper_mode(), "opens": opens_out}, indent=2))
     return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Live Kraken execute for FILLS/RISK")
+    parser = argparse.ArgumentParser(description="Live Kraken execute for the desk")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     buy = sub.add_parser("buy")
@@ -322,7 +273,7 @@ def main() -> int:
     sell.add_argument("--pair", required=True)
     sell.add_argument("--wsname", default="")
     sell.add_argument("--cycle-id", required=True)
-    sell.add_argument("--rule", default="VOLUME_6H")
+    sell.add_argument("--rule", default="MANUAL")
     sell.add_argument("--volume-base", type=float, default=0)
     sell.set_defaults(func=cmd_sell)
 

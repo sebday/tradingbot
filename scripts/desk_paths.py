@@ -1,4 +1,4 @@
-"""Shared paths for the Kraken desk. Runtime data lives in $EVOSHELL_STATE/trading."""
+"""Shared paths for the Kraken desk. Logs live in $EVOSHELL_STATE/trading, the ledger in the repo."""
 from __future__ import annotations
 
 import os
@@ -24,7 +24,7 @@ def ledger_dir() -> Path:
     override = os.environ.get("TRADING_DESK_LEDGER", "").strip()
     if override:
         return Path(override)
-    return state_dir() / "ledger"
+    return ROOT / "ledger"
 
 
 STATE_DIR = state_dir()

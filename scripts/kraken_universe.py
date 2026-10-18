@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import urllib.request
 from datetime import datetime, timezone
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
 from desk_paths import ROOT, ledger_dir
@@ -125,6 +126,8 @@ def ticker_metrics(tick: dict) -> dict:
     vol_base_24h = float(tick["v"][1])
     trades_24h = int(tick["t"][1])
     open_px = float(tick["o"])
+    high_24h = float(tick["h"][1]) if tick.get("h") else None
+    low_24h = float(tick["l"][1]) if tick.get("l") else None
     mid = (ask + bid) / 2.0 if ask and bid else last
     spread = ((ask - bid) / mid) if mid else None
     pct_change = ((last - open_px) / open_px) if open_px else None
@@ -139,6 +142,8 @@ def ticker_metrics(tick: dict) -> dict:
         "volume_base_24h": vol_base_24h,
         "volume_24h_quote": volume_24h_quote,
         "trades_24h": trades_24h,
+        "high_24h": high_24h,
+        "low_24h": low_24h,
     }
 
 
@@ -174,8 +179,15 @@ def round_quote_usd(dollars: float) -> str:
 
 
 def round_base(qty: float, lot_decimals: int | None) -> str:
+    """Round down so a sell never asks for more than the balance holds."""
     decimals = int(lot_decimals if lot_decimals is not None else 8)
-    q = round(float(qty), decimals)
+    q = Decimal(str(qty)).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_DOWN)
+    return f"{q:.{decimals}f}"
+
+
+def round_price(price: float, pair_decimals: int | None) -> str:
+    decimals = int(pair_decimals if pair_decimals is not None else 8)
+    q = Decimal(str(price)).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_DOWN)
     return f"{q:.{decimals}f}"
 
 

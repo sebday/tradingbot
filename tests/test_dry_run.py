@@ -13,10 +13,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+import desk_book  # noqa: E402
 import desk_context  # noqa: E402
+import desk_cycle  # noqa: E402
 import desk_exit_check  # noqa: E402
 import desk_halt  # noqa: E402
 import desk_paths  # noqa: E402
+import desk_rules  # noqa: E402
 import kraken_universe as ku  # noqa: E402
 
 FORBIDDEN = (
@@ -133,12 +136,19 @@ class DeskShape(unittest.TestCase):
         self.assertEqual(cfg["scan"]["dayMoveMin"], 0)
         self.assertEqual(cfg["scan"]["dayMoveMax"], 0.15)
         self.assertEqual(cfg["risk"]["exitPollSeconds"], 300)
+        self.assertEqual(cfg["risk"]["stopLossPct"], 0.08)
+        self.assertIn("enabled", cfg["entry"])
+        self.assertNotIn("viqc", cfg["live"].get("buyOflags", ""))
 
-    def test_no_mechanical_cycle_script(self):
-        self.assertFalse((SCRIPTS / "paper-cycle.py").exists())
+    def test_cycle_is_a_script_and_the_llm_only_vetoes(self):
         self.assertTrue((ROOT / "bin" / "run-desk-cycle").exists())
+        self.assertTrue((SCRIPTS / "desk_cycle.py").exists())
         self.assertTrue((SCRIPTS / "kraken_execute.py").exists())
-        self.assertTrue((SCRIPTS / "desk_context.py").exists())
+        self.assertTrue((ROOT / ".cursor" / "skills" / "desk-vet" / "SKILL.md").exists())
+        for seat in ("scan", "vet", "size", "fills", "risk", "book", "chief"):
+            self.assertFalse((ROOT / ".cursor" / "agents" / f"{seat}.md").exists(), seat)
+        skill = (ROOT / ".cursor" / "skills" / "desk-vet" / "SKILL.md").read_text()
+        self.assertIn("record-vetoes", skill)
 
     def test_scripts_have_no_forbidden_venues(self):
         for f in SCRIPTS.rglob("*"):
@@ -280,49 +290,284 @@ class DayBandAndExit(unittest.TestCase):
         self.cfg = json.loads((ROOT / "config.json").read_text())
 
     def test_day_band_allows_an_up_day_inside_the_cap(self):
-        self.assertIsNone(desk_exit_check.day_move_failure(0.04, self.cfg))
-        self.assertIsNone(desk_exit_check.day_move_failure(0.15, self.cfg))
+        self.assertIsNone(desk_rules.day_move_failure(0.04, self.cfg))
+        self.assertIsNone(desk_rules.day_move_failure(0.15, self.cfg))
 
     def test_day_band_rejects_flat_red_and_spent(self):
-        self.assertEqual(desk_exit_check.day_move_failure(0.0, self.cfg), "DAY_FLAT")
-        self.assertEqual(desk_exit_check.day_move_failure(-0.03, self.cfg), "DAY_FLAT")
-        self.assertEqual(desk_exit_check.day_move_failure(None, self.cfg), "DAY_FLAT")
-        self.assertEqual(desk_exit_check.day_move_failure(0.16, self.cfg), "MOVE_SPENT")
+        self.assertEqual(desk_rules.day_move_failure(0.0, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_rules.day_move_failure(-0.03, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_rules.day_move_failure(None, self.cfg), "DAY_FLAT")
+        self.assertEqual(desk_rules.day_move_failure(0.16, self.cfg), "MOVE_SPENT")
 
     def test_armed_winner_ignores_dead_volume(self):
-        rule = desk_exit_check.exit_rule(100, 140, True, 120, 0.05, True, self.cfg)
-        self.assertIsNone(rule)
+        self.assertEqual(desk_rules.decide(100, 140, True, 120, 0.05, True, self.cfg), "HOLD")
 
     def test_armed_winner_closes_on_the_floor(self):
-        rule = desk_exit_check.exit_rule(100, 140, True, 112, 0.05, True, self.cfg)
-        self.assertEqual(rule, "TRAIL_PEAK")
+        self.assertEqual(desk_rules.decide(100, 140, True, 112, 0.05, True, self.cfg), "TRAIL_PEAK")
 
-    def test_missing_last_does_not_volume_close_a_winner(self):
-        rule = desk_exit_check.exit_rule(100, 140, True, None, None, False, self.cfg)
-        self.assertIsNone(rule)
+    def test_missing_last_is_stale_not_a_sell(self):
+        self.assertEqual(desk_rules.decide(100, 140, True, None, None, False, self.cfg), "STALE")
 
     def test_unarmed_position_closes_on_dead_volume(self):
-        rule = desk_exit_check.exit_rule(100, 120, True, 110, 0.1, True, self.cfg)
-        self.assertEqual(rule, "VOLUME_6H")
+        self.assertEqual(desk_rules.decide(100, 120, True, 110, 0.1, True, self.cfg), "VOLUME_6H")
 
     def test_unarmed_position_holds_when_volume_is_alive(self):
-        rule = desk_exit_check.exit_rule(100, 120, True, 110, 0.8, True, self.cfg)
-        self.assertIsNone(rule)
+        self.assertEqual(desk_rules.decide(100, 120, True, 110, 0.8, True, self.cfg), "HOLD")
 
-    def test_unknown_volume_closes_only_when_the_trail_is_not_armed(self):
-        rule = desk_exit_check.exit_rule(100, 110, True, 105, None, False, self.cfg)
-        self.assertEqual(rule, "VOLUME_6H")
+    def test_unknown_volume_holds_instead_of_selling(self):
+        self.assertEqual(desk_rules.decide(100, 110, True, 105, None, False, self.cfg), "STALE")
 
     def test_peak_requires_the_fill_hour(self):
         fill = 1_700_000_000
         hour = fill - (fill % 3600)
         late = [[hour + 3600, 0, 9, 0, 0, 0, 1, 0]]
-        self.assertEqual(desk_exit_check.peak_since_fill(late, fill), (None, False))
+        self.assertEqual(desk_rules.peak_since_fill(late, fill), (None, False))
         covered = [
             [hour, 0, 5, 0, 0, 0, 1, 0],
             [hour + 3600, 0, 9, 0, 0, 0, 1, 0],
         ]
-        self.assertEqual(desk_exit_check.peak_since_fill(covered, fill), (9.0, True))
+        self.assertEqual(desk_rules.peak_since_fill(covered, fill), (9.0, True))
+
+
+class StopLoss(unittest.TestCase):
+    def setUp(self):
+        self.cfg = json.loads((ROOT / "config.json").read_text())
+
+    def test_stop_fires_on_the_ticker_alone(self):
+        self.assertEqual(desk_rules.decide(100, None, False, 91.9, None, False, self.cfg), "STOP_LOSS")
+        self.assertEqual(desk_rules.decide(100, None, False, 92.0, None, False, self.cfg), "STOP_LOSS")
+
+    def test_stop_ignores_healthy_volume(self):
+        self.assertEqual(desk_rules.decide(100, 101, True, 90, 1.5, True, self.cfg), "STOP_LOSS")
+
+    def test_just_above_the_stop_holds(self):
+        self.assertEqual(desk_rules.decide(100, 101, True, 92.5, 1.0, True, self.cfg), "HOLD")
+
+    def test_stale_alert_fires_once_after_the_threshold(self):
+        state: dict = {}
+        cfg = {"risk": {"staleAlertMinutes": 30}}
+        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 0, cfg))
+        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 29 * 60, cfg))
+        self.assertTrue(desk_exit_check.track_stale(state, "X", True, 30 * 60, cfg))
+        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 60 * 60, cfg))
+        self.assertFalse(desk_exit_check.track_stale(state, "X", False, 61 * 60, cfg))
+        self.assertNotIn("X", state)
+
+
+def write_ledger(tmp: Path, fills: list[dict], closes: list[dict]) -> None:
+    (tmp / "fills.jsonl").write_text("".join(json.dumps(r) + "\n" for r in fills), encoding="utf-8")
+    (tmp / "closes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in closes), encoding="utf-8")
+
+
+def fill(pair: str, ts: str, usd: float, qty: float) -> dict:
+    return {"ts": ts, "pair_id": pair, "wsname": pair, "venue": "kraken", "filled": usd, "volume_base": qty}
+
+
+def close(pair: str, ts: str, usd: float, qty: float, **extra) -> dict:
+    row = {"ts": ts, "pair_id": pair, "venue": "kraken", "action": "CLOSE", "status": "closed",
+           "filled": usd, "volume_base": qty}
+    row.update(extra)
+    return row
+
+
+class BookEpisodes(unittest.TestCase):
+    def test_reentry_after_a_full_close_is_a_new_position(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_ledger(
+                Path(tmp),
+                [
+                    fill("SOLUSD", "2026-10-07T00:00:00Z", 50.0, 0.4),
+                    fill("SOLUSD", "2026-10-08T00:00:00Z", 10.0, 0.1),
+                    fill("SOLUSD", "2026-10-17T06:04:00Z", 20.0, 0.2),
+                ],
+                [close("SOLUSD", "2026-10-17T06:01:00Z", 45.0, 0.4999)],
+            )
+            book = desk_book.load_book("kraken", Path(tmp))
+            pos = book.position("SOLUSD")
+            self.assertIsNotNone(pos)
+            self.assertEqual(pos.opened_ts, "2026-10-17T06:04:00Z")
+            self.assertEqual(pos.n_buys, 1)
+            self.assertAlmostEqual(pos.entry, 100.0)
+            self.assertEqual(book.last_close_ts["SOLUSD"], "2026-10-17T06:01:00Z")
+            self.assertAlmostEqual(book.closed[0].pnl_usd, -15.0)
+
+    def test_close_dust_does_not_keep_an_episode_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_ledger(
+                Path(tmp),
+                [fill("PUMPUSD", "2026-10-07T00:00:00Z", 30.0, 100.0)],
+                [close("PUMPUSD", "2026-10-17T00:00:00Z", 20.0, 99.99)],
+            )
+            self.assertEqual(desk_book.load_book("kraken", Path(tmp)).open_positions(), [])
+
+    def test_hold_skip_and_failed_sells_keep_the_position(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_ledger(
+                Path(tmp),
+                [fill("ARBUSD", "2026-10-01T00:00:00Z", 30.0, 100.0)],
+                [
+                    {"ts": "2026-10-02T00:00:00Z", "pair_id": "ARBUSD", "venue": "kraken", "action": "HOLD", "status": "open"},
+                    {"ts": "2026-10-03T00:00:00Z", "pair_id": "ARBUSD", "venue": "kraken", "action": "SKIP_DUST"},
+                    close("ARBUSD", "2026-10-04T00:00:00Z", 0.0, 0.0, status="canceled"),
+                    {"ts": "2026-10-05T00:00:00Z", "pair_id": "ARBUSD", "venue": "kraken", "action": "SELL_FAILED"},
+                ],
+            )
+            self.assertIsNotNone(desk_book.load_book("kraken", Path(tmp)).position("ARBUSD"))
+
+    def test_execute_opens_lists_a_reentered_pair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_ledger(
+                Path(tmp),
+                [fill("XXBTZUSD", "2026-10-10T00:00:00Z", 60.0, 0.0007),
+                 fill("XXBTZUSD", "2026-10-18T03:00:00Z", 90.0, 0.0011)],
+                [close("XXBTZUSD", "2026-10-17T06:00:00Z", 59.0, 0.0007)],
+            )
+            env = os.environ.copy()
+            env["TRADING_DESK_LEDGER"] = tmp
+            run = subprocess.run(
+                [sys.executable, str(SCRIPTS / "kraken_execute.py"), "opens"],
+                cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            opens = json.loads(run.stdout)["opens"]
+            self.assertEqual([o["pair_id"] for o in opens], ["XXBTZUSD"])
+            self.assertAlmostEqual(opens[0]["filled_usd"], 90.0)
+
+    def test_reconcile_flags_untracked_and_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_ledger(Path(tmp), [fill("NEARUSD", "2026-10-07T00:00:00Z", 50.0, 10.0),
+                                     fill("SOLUSD", "2026-10-07T00:00:00Z", 20.0, 0.2)], [])
+            book = desk_book.load_book("kraken", Path(tmp))
+            universe = {"pairs": [
+                {"pair_id": "NEARUSD", "base": "NEAR", "wsname": "NEAR/USD"},
+                {"pair_id": "SOLUSD", "base": "SOL", "wsname": "SOL/USD"},
+                {"pair_id": "BABYUSD", "base": "BABY", "wsname": "BABY/USD"},
+                {"pair_id": "XETHZUSD", "base": "XETH", "wsname": "ETH/USD"},
+            ]}
+            leftover = [{"asset": "NEAR", "amount": 10.0}, {"asset": "BABY", "amount": 3.0},
+                        {"asset": "XETH", "amount": 0.05}]
+            rec = desk_book.reconcile(book, leftover, universe, {"BABYUSD": 0.01, "XETHZUSD": 2400.0})
+            self.assertEqual([u["pair_id"] for u in rec["untracked"]], ["XETHZUSD"])
+            self.assertEqual([m["pair_id"] for m in rec["missing"]], ["SOLUSD"])
+
+
+class EntryGuards(unittest.TestCase):
+    def setUp(self):
+        self.cfg = json.loads((ROOT / "config.json").read_text())
+        self.now = desk_rules.parse_ts("2026-10-18T12:00:00Z")
+
+    def book(self, fills, closes):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        write_ledger(Path(tmp.name), fills, closes)
+        return desk_book.load_book("kraken", Path(tmp.name))
+
+    def test_already_held_pair_is_blocked(self):
+        b = self.book([fill("PUMPUSD", "2026-10-07T00:00:00Z", 30, 100)], [])
+        self.assertEqual(desk_rules.entry_block("PUMPUSD", b, self.cfg, self.now), "ALREADY_HELD")
+        self.assertIsNone(desk_rules.entry_block("SOLUSD", b, self.cfg, self.now))
+
+    def test_reentry_cooldown(self):
+        b = self.book([fill("SOLUSD", "2026-10-10T00:00:00Z", 30, 1)],
+                      [close("SOLUSD", "2026-10-18T00:00:00Z", 28, 1)])
+        self.assertEqual(desk_rules.entry_block("SOLUSD", b, self.cfg, self.now), "REENTRY_COOLDOWN")
+        later = desk_rules.parse_ts("2026-10-19T00:30:00Z")
+        self.assertIsNone(desk_rules.entry_block("SOLUSD", b, self.cfg, later))
+
+    def test_max_new_per_day(self):
+        fills = [fill(f"P{i}USD", f"2026-10-18T0{i}:00:00Z", 10, 1) for i in range(3)]
+        b = self.book(fills, [])
+        self.assertEqual(desk_rules.entry_block("NEWUSD", b, self.cfg, self.now), "MAX_NEW_PER_DAY")
+
+    def test_max_open_books(self):
+        fills = [fill(f"P{i}USD", f"2026-10-0{i + 1}T00:00:00Z", 10, 1) for i in range(7)]
+        b = self.book(fills, [])
+        self.assertEqual(desk_rules.entry_block("NEWUSD", b, self.cfg, self.now), "MAX_OPEN_BOOKS")
+
+    def test_stablecoins_and_fiat_are_excluded(self):
+        for ws in ("USDT/USD", "GBP/USD", "EURC/USD", "USDC/USD"):
+            self.assertTrue(desk_rules.excluded_base({"wsname": ws}, self.cfg), ws)
+        for ws in ("XBT/USD", "SOL/USD", "STBL/USD"):
+            self.assertFalse(desk_rules.excluded_base({"wsname": ws}, self.cfg), ws)
+
+    def test_flat_range_is_rejected(self):
+        m = {"volume_24h_quote": 1e7, "spread": 0.0001, "pct_change": 0.002, "high_24h": 1.001, "low_24h": 0.999}
+        self.assertEqual(desk_rules.scan_failure({"wsname": "ABC/USD"}, m, self.cfg), "RANGE_FLAT")
+        m.update(high_24h=1.05, low_24h=0.97)
+        self.assertIsNone(desk_rules.scan_failure({"wsname": "ABC/USD"}, m, self.cfg))
+
+    def test_ticket_is_a_share_of_equity(self):
+        dollars, why = desk_rules.ticket_usd(500, 400, 100, 5, self.cfg)
+        self.assertIsNone(why)
+        self.assertAlmostEqual(dollars, 30.0)
+
+    def test_ticket_halves_when_degraded(self):
+        dollars, _ = desk_rules.ticket_usd(500, 400, 100, 5, self.cfg, partial=True)
+        self.assertAlmostEqual(dollars, 15.0)
+
+    def test_exposure_cap_blocks_new_tickets(self):
+        self.assertEqual(desk_rules.ticket_usd(486, 164, 322, 5, self.cfg), (0.0, "EXPOSURE_CAP"))
+        self.assertEqual(desk_rules.ticket_usd(500, 300, 245, 5, self.cfg), (0.0, "EXPOSURE_CAP"))
+        self.assertEqual(desk_rules.ticket_usd(500, 300, 235, 5, self.cfg), (15.0, None))
+
+    def test_ticket_floor_skips_dust_buys(self):
+        self.assertEqual(desk_rules.ticket_usd(100, 100, 0, 5, self.cfg), (0.0, "TICKET_FLOOR"))
+        self.assertEqual(desk_rules.ticket_usd(1000, 8, 0, 5, self.cfg), (0.0, "CASH"))
+
+
+class VetAndPlan(unittest.TestCase):
+    def setUp(self):
+        self.cfg = json.loads((ROOT / "config.json").read_text())
+        self.shortlist = {
+            "cycle_id": "C1",
+            "degraded": False,
+            "candidates": [
+                {"pair_id": "AUSD", "wsname": "A/USD", "rank": 1, "min_ticket_usd": 5},
+                {"pair_id": "BUSD", "wsname": "B/USD", "rank": 2, "min_ticket_usd": 5},
+            ],
+        }
+        self.empty = desk_book.Book(venue="kraken", positions={}, closed=[], last_close_ts={})
+        self.now = desk_rules.parse_ts("2026-10-18T12:00:00Z")
+
+    def test_missing_verdicts_are_vetoes(self):
+        out = desk_cycle.validate_vetoes(
+            self.shortlist,
+            {"cycle_id": "C1", "vetoes": [{"pair_id": "AUSD", "veto": False}, {"pair_id": "ZZZ", "veto": False}]},
+        )
+        self.assertEqual([(v["pair_id"], v["veto"]) for v in out["vetoes"]], [("AUSD", False), ("BUSD", True)])
+
+    def test_verdicts_for_another_cycle_are_refused(self):
+        with self.assertRaises(ValueError):
+            desk_cycle.validate_vetoes(self.shortlist, {"cycle_id": "C0", "vetoes": []})
+
+    def test_no_vetoes_file_means_no_buys(self):
+        plan = desk_cycle.plan_entries(self.cfg, self.shortlist, None, self.empty, 500, 500, False, self.now)
+        self.assertTrue(all(d["dollars"] == 0 and d["reason"] == "VET_MISSING" for d in plan))
+
+    def test_one_buy_per_cycle_and_vetoes_respected(self):
+        vetoes = {"cycle_id": "C1", "vetoes": [{"pair_id": "AUSD", "veto": False}, {"pair_id": "BUSD", "veto": False}]}
+        plan = desk_cycle.plan_entries(self.cfg, self.shortlist, vetoes, self.empty, 500, 500, False, self.now)
+        self.assertEqual([d["reason"] for d in plan], ["PASS", "MAX_FILLS_PER_CYCLE"])
+        self.assertAlmostEqual(plan[0]["dollars"], 30.0)
+        vetoes["vetoes"][0]["veto"] = True
+        plan = desk_cycle.plan_entries(self.cfg, self.shortlist, vetoes, self.empty, 500, 500, False, self.now)
+        self.assertEqual([d["reason"] for d in plan], ["LLM_VETO", "PASS"])
+
+    def test_halt_blocks_entries(self):
+        vetoes = {"cycle_id": "C1", "vetoes": [{"pair_id": "AUSD", "veto": False}]}
+        plan = desk_cycle.plan_entries(self.cfg, self.shortlist, vetoes, self.empty, 500, 500, True, self.now)
+        self.assertEqual(plan[0]["reason"], "HALTED")
+
+
+class LimitPricing(unittest.TestCase):
+    def test_limit_is_ask_plus_slippage_cap(self):
+        cfg = {"entry": {"maxSlippageBps": 40}}
+        self.assertAlmostEqual(desk_rules.limit_buy_price(100.0, cfg), 100.4)
+
+    def test_price_and_volume_round_down(self):
+        self.assertEqual(ku.round_price(0.0063369, 6), "0.006336")
+        self.assertEqual(ku.round_base(30 / 0.006336, 0), "4734")
+        self.assertEqual(ku.round_base(0.123456789, 8), "0.12345678")
 
 
 if __name__ == "__main__":

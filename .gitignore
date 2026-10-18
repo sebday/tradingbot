@@ -9,5 +9,8 @@ ledger/*.jsonl
 ledger/universe-kraken.json
 ledger/context.json
 ledger/halt.json
+ledger/shortlist.json
+ledger/vetoes.json
+ledger/reconcile.json
 ledger/_scan_tmp.json
 ledger/_scan_cycle_out.json
