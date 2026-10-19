@@ -52,4 +52,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        code = main()
+    except Exception as exc:
+        print(exc, file=sys.stderr)
+        code = 1
+    raise SystemExit(code)

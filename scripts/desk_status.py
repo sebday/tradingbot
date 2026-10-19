@@ -35,6 +35,47 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def brief_error(text: str) -> str:
+    raw = (text or "").strip()
+    if not raw:
+        return "balance failed"
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if line.startswith("RuntimeError:"):
+            line = line.removeprefix("RuntimeError:").strip()
+        if line:
+            return line[:180]
+    return "balance failed"
+
+
+def latest_amounts(path: Path) -> tuple[float | None, float | None]:
+    """Last cycle that actually recorded equity, skipping failed balance rows."""
+    if not path.is_file():
+        return None, None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None, None
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("kind") == "exit" or row.get("equity_usd") is None:
+            continue
+        try:
+            equity = float(row["equity_usd"])
+            spot = row.get("usd_spot")
+            usd = float(spot) if spot is not None else None
+        except (TypeError, ValueError):
+            continue
+        return equity, usd
+    return None, None
+
+
 def tail_jsonl(path: Path) -> dict | None:
     if not path.is_file():
         return None
@@ -142,7 +183,7 @@ def main() -> int:
             usd_spot = bal.get("usd_spot")
             halted = bool(bal.get("halted")) or halted
         else:
-            balance_err = (proc.stderr or proc.stdout or "balance failed")[:200]
+            balance_err = brief_error(proc.stderr or proc.stdout)
     except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
         balance_err = str(e)[:200]
 
@@ -190,10 +231,12 @@ def main() -> int:
         except (OSError, json.JSONDecodeError):
             pass
 
-    if equity is None and last_cycle:
-        equity = last_cycle.get("equity_usd")
-    if usd_spot is None and last_cycle:
-        usd_spot = last_cycle.get("usd_spot")
+    if equity is None or usd_spot is None:
+        prev_equity, prev_spot = latest_amounts(ledger / "reports.jsonl")
+        if equity is None:
+            equity = prev_equity
+        if usd_spot is None:
+            usd_spot = prev_spot
 
     bar_text = ""
     if equity is not None:
@@ -222,7 +265,7 @@ def main() -> int:
         "desk_root": str(ROOT),
         "fetched_at": utc_now(),
     }
-    if not bar_text and balance_err:
+    if not bar_text and balance_err and not positions:
         out["ok"] = False
         out["class"] = "error"
         out["error"] = balance_err
