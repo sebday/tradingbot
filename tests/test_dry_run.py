@@ -300,22 +300,23 @@ class DayBandAndExit(unittest.TestCase):
         self.assertEqual(desk_rules.day_move_failure(0.16, self.cfg), "MOVE_SPENT")
 
     def test_armed_winner_ignores_dead_volume(self):
-        self.assertEqual(desk_rules.decide(100, 140, True, 120, 0.05, True, self.cfg), "HOLD")
+        # Peak +40% with a 5% giveback floors at 133, so 135 is still a hold.
+        self.assertEqual(desk_rules.decide(100, 140, True, 135, 0.05, True, self.cfg), "HOLD")
 
     def test_armed_winner_closes_on_the_floor(self):
-        self.assertEqual(desk_rules.decide(100, 140, True, 112, 0.05, True, self.cfg), "TRAIL_PEAK")
+        self.assertEqual(desk_rules.decide(100, 140, True, 132, 0.05, True, self.cfg), "TRAIL_PEAK")
 
     def test_missing_last_is_stale_not_a_sell(self):
         self.assertEqual(desk_rules.decide(100, 140, True, None, None, False, self.cfg), "STALE")
 
     def test_unarmed_position_closes_on_dead_volume(self):
-        self.assertEqual(desk_rules.decide(100, 120, True, 110, 0.1, True, self.cfg), "VOLUME_6H")
+        self.assertEqual(desk_rules.decide(100, 105, True, 104, 0.1, True, self.cfg), "VOLUME_6H")
 
     def test_unarmed_position_holds_when_volume_is_alive(self):
-        self.assertEqual(desk_rules.decide(100, 120, True, 110, 0.8, True, self.cfg), "HOLD")
+        self.assertEqual(desk_rules.decide(100, 105, True, 104, 0.8, True, self.cfg), "HOLD")
 
     def test_unknown_volume_holds_instead_of_selling(self):
-        self.assertEqual(desk_rules.decide(100, 110, True, 105, None, False, self.cfg), "STALE")
+        self.assertEqual(desk_rules.decide(100, 105, True, 104, None, False, self.cfg), "STALE")
 
     def test_peak_requires_the_fill_hour(self):
         fill = 1_700_000_000
