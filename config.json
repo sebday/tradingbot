@@ -60,7 +60,9 @@
       "EURC", "EURQ", "EURR", "EUR", "GBP", "AUD", "CAD", "CHF", "JPY"
     ]
   },
-  "models": {
-    "vet": "composer-2.5"
+  "desk": {
+    "live": true,
+    "model": "grok-4.7-high",
+    "wakeTimeoutSeconds": 900
   }
 }

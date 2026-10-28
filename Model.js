@@ -86,6 +86,7 @@ function parsePayload(raw) {
     allocated_usd: json.allocated_usd,
     halt_floor_usd: json.halt_floor_usd,
     halted: json.halted === true,
+    desk_live: json.desk_live === true,
     open_count: json.open_count || 0,
     positions: Array.isArray(json.positions) ? json.positions : [],
     last_cycle: json.last_cycle || null,
@@ -121,11 +122,12 @@ function barTooltip(data, loading) {
 }
 
 function runnerLine(runner) {
-  if (!runner || typeof runner !== "object") return "No cycle yet"
-  if (runner.running) return "Cycle running"
+  if (!runner || typeof runner !== "object") return "No wake yet"
+  if (runner.running) return "Wake running"
   if (runner.stale) return "Over 70m ago"
-  if (runner.finished_at) return "Last cycle " + clock(runner.finished_at)
-  return "No cycle yet"
+  if (runner.finished_at) return "Last wake " + clock(runner.finished_at)
+  if (runner.next_wake) return "Next wake " + clock(runner.next_wake)
+  return "No wake yet"
 }
 
 function deskBadge(data) {
@@ -133,7 +135,7 @@ function deskBadge(data) {
   if (data.halted) return "Halted"
   if (data.runner && data.runner.running) return "Running"
   if (data.runner && data.runner.stale) return "Stale"
-  if (data.last_cycle && data.last_cycle.paper === true) return "Paper"
+  if (data.desk_live !== true) return "Shadow"
   return "Live"
 }
 

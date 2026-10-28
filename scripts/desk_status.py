@@ -13,22 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from desk_paths import STATE_DIR, ledger_dir  # noqa: E402
-
-RUN_META = STATE_DIR / "last_run.json"
-
-
-def _runtime_dir() -> Path:
-    import os
-
-    rd = os.environ.get("XDG_RUNTIME_DIR")
-    if rd:
-        return Path(rd)
-    return Path.home() / ".cache"
-
-
-def lock_path() -> Path:
-    return _runtime_dir() / "evo-trading-desk.lock"
+from desk_paths import ledger_dir  # noqa: E402
 
 
 def utc_now() -> str:
@@ -119,32 +104,63 @@ def fetch_tickers(pair_ids: list[str]) -> dict[str, float]:
     return out
 
 
+def _wake_running(path: Path) -> bool:
+    import fcntl
+
+    if not path.is_file():
+        return False
+    fd = path.open("a", encoding="utf-8")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    else:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        fd.close()
+
+
 def runner_state() -> dict:
-    meta: dict = {}
-    if RUN_META.is_file():
+    """The bar clock is the Grok wake, not the retired hourly entry cycle."""
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from desk.config import next_wake_iso, state_dir
+    from desk.db import connect, db_path
+
+    running = _wake_running(state_dir() / "wake.lock")
+    finished_at = None
+    exit_code = ""
+    error = ""
+    path = db_path()
+    if path.is_file():
+        conn = connect(path)
         try:
-            meta = json.loads(RUN_META.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            meta = {}
-    running = bool(meta.get("running"))
-    if meta.get("finished_at") is None and meta.get("started_at"):
-        running = True
+            row = conn.execute("SELECT ts, status, summary FROM wakes ORDER BY id DESC LIMIT 1").fetchone()
+        finally:
+            conn.close()
+        if row:
+            finished_at = row["ts"]
+            if row["status"] == "ok":
+                exit_code = "0"
+            else:
+                exit_code = "1"
+                error = str(row["summary"] or "wake failed")[:180]
     stale = False
-    last_ts = meta.get("finished_at") or meta.get("started_at")
-    if last_ts:
+    if finished_at and not running:
         try:
-            t = datetime.fromisoformat(str(last_ts).replace("Z", "+00:00"))
-            age_min = (datetime.now(timezone.utc) - t).total_seconds() / 60.0
-            stale = age_min > 70
+            t = datetime.fromisoformat(str(finished_at).replace("Z", "+00:00"))
+            stale = (datetime.now(timezone.utc) - t).total_seconds() / 60.0 > 70
         except ValueError:
             stale = True
     return {
         "running": running,
         "stale": stale,
-        "started_at": meta.get("started_at"),
-        "finished_at": meta.get("finished_at"),
-        "exit_code": meta.get("exit_code"),
-        "error": meta.get("error"),
+        "started_at": None,
+        "finished_at": finished_at,
+        "exit_code": exit_code,
+        "error": error,
+        "next_wake": next_wake_iso(),
     }
 
 
@@ -257,6 +273,7 @@ def main() -> int:
         "allocated_usd": round(allocated, 2),
         "halt_floor_usd": round(floor, 2),
         "halted": halted,
+        "desk_live": bool((config.get("desk") or {}).get("live")),
         "open_count": len(positions),
         "positions": positions,
         "last_cycle": last_cycle,

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Open the Grok desk chat. One argument so a terminal's -e can launch it.
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/desk" chat

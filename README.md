@@ -1,6 +1,6 @@
 # omarchy-trading
 
-Live Kraken USD spot desk plus the **evo.trading** Omarchy bar widget. Entries and exits are deterministic Python; the only LLM step is a veto over the hourly shortlist.
+Live Kraken USD spot desk plus the **evo.trading** Omarchy bar widget. Once an hour Grok decides and can place orders. A one-minute runner acts only on rules it set. The 5-minute exit timer still guards positions that have no rule yet.
 
 ## Omarchy bar
 
@@ -18,30 +18,18 @@ omarchy plugin enable evo.trading
 
 Add `evo.trading` to `shell.json` `plugins` and bar `layout` (see hyprdots).
 
-## Hourly cycle
+## Hourly wake
+
+Grok 4.7 decides once an hour (`desk-wake.timer`, at :02). The bar badge follows that wake, not the old entry cycle. Orders go to Kraken only while `desk.live` is true. Each order needs a `--reason`, stored in `state/grok.db`.
 
 ```bash
-systemctl --user link ~/projects/tradingbot/systemd/evo-trading-desk.{service,timer}
-systemctl --user enable --now evo-trading-desk.timer
+systemctl --user link ~/projects/tradingbot/systemd/desk-wake.{service,timer}
+systemctl --user enable --now desk-wake.timer
+systemctl --user link ~/projects/tradingbot/systemd/desk-runner.{service,timer}
+systemctl --user enable --now desk-runner.timer
 ```
 
-`bin/run-desk-cycle` runs:
-
-1. `scripts/desk_context.py`: market context into `ledger/context.json`
-2. `scripts/desk_cycle.py shortlist`: gates, stablecoin and fiat exclusions, and book guards into `ledger/shortlist.json`
-3. `cursor-agent -p "/desk-vet"`: the LLM may veto shortlisted names, nothing else. No verdicts means no buys.
-4. `scripts/desk_cycle.py execute`: balance, reconcile, sizing, one limit IOC buy (or a shadow row)
-5. `scripts/desk_exit_check.py`: an exit pass
-
-Logs: `~/.local/state/evoshell/trading/desk-cycle.log`
-
-### Entry guards
-
-- Never adds to a pair already held, and waits `entry.reentryCooldownHours` after a close
-- At most `entry.maxNewPerDay` new positions per rolling 24 hours, and `maxOpenBooks` open
-- Ticket is `entry.ticketPctEquity` of equity, at least `entry.minTicketUsd`, and total exposure stays under `entry.maxExposurePct` of equity
-- Buys are limit IOC at ask + `entry.maxSlippageBps`
-- `entry.enabled: false` is shadow mode: decisions go to `ledger/shadow.jsonl`, nothing is bought
+`bin/desk wake` builds the snapshot and resumes the chat. `bin/desk run` is the one-minute pass that sells or buys only when a rule Grok set says so. `bin/desk trades` prints the log.
 
 ## Exit check
 
@@ -81,4 +69,5 @@ python3 scripts/desk_status.py     # JSON for the bar
 ```bash
 cd ~/projects/tradingbot
 python3 tests/test_dry_run.py
+python3 -m unittest tests.test_grok_desk
 ```

@@ -133,7 +133,7 @@ Panel {
       terminal,
       "--working-directory=" + rootPath,
       "-e",
-      "cursor-agent"
+      rootPath + "/bin/desk-chat"
     ])
     root.close()
   }

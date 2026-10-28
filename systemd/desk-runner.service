@@ -1,13 +1,13 @@
 [Unit]
-Description=Kraken desk cycle (cursor-agent /desk-cycle)
+Description=Grok desk rule runner (sells and waiting buys)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 WorkingDirectory=%h/projects/tradingbot
-ExecStart=%h/projects/tradingbot/bin/run-desk-cycle
-TimeoutStartSec=45min
+ExecStart=%h/projects/tradingbot/bin/desk run
+TimeoutStartSec=50s
 
 [Install]
 WantedBy=default.target

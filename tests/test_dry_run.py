@@ -140,15 +140,15 @@ class DeskShape(unittest.TestCase):
         self.assertIn("enabled", cfg["entry"])
         self.assertNotIn("viqc", cfg["live"].get("buyOflags", ""))
 
-    def test_cycle_is_a_script_and_the_llm_only_vetoes(self):
-        self.assertTrue((ROOT / "bin" / "run-desk-cycle").exists())
-        self.assertTrue((SCRIPTS / "desk_cycle.py").exists())
-        self.assertTrue((SCRIPTS / "kraken_execute.py").exists())
-        self.assertTrue((ROOT / ".cursor" / "skills" / "desk-vet" / "SKILL.md").exists())
+    def test_entry_timer_is_retired(self):
+        self.assertTrue((ROOT / "bin" / "desk").exists())
+        self.assertTrue((ROOT / "systemd" / "desk-wake.timer").exists())
+        self.assertTrue((ROOT / "systemd" / "evo-trading-exit.timer").exists())
+        self.assertFalse((ROOT / "bin" / "run-desk-cycle").exists())
+        self.assertFalse((ROOT / "systemd" / "evo-trading-desk.timer").exists())
+        self.assertFalse((ROOT / "systemd" / "omarchy-trading-desk.timer").exists())
         for seat in ("scan", "vet", "size", "fills", "risk", "book", "chief"):
             self.assertFalse((ROOT / ".cursor" / "agents" / f"{seat}.md").exists(), seat)
-        skill = (ROOT / ".cursor" / "skills" / "desk-vet" / "SKILL.md").read_text()
-        self.assertIn("record-vetoes", skill)
 
     def test_scripts_have_no_forbidden_venues(self):
         for f in SCRIPTS.rglob("*"):

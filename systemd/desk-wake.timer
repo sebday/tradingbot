@@ -1,0 +1,10 @@
+[Unit]
+Description=Grok desk decision at minute :02 of each hour
+
+[Timer]
+OnCalendar=*-*-* *:02:00
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
