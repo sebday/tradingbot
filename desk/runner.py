@@ -1,9 +1,14 @@
-"""One pass over exit rules and waiting buys. Sells or buys only when a rule says so."""
+"""One pass over exit rules and waiting buys. Sells or buys only when a rule says so.
+
+A position with no active rule gets the risk.stopLossPct stop and the risk.trailArmPct /
+risk.trailGiveback trail. This runner is the only seller.
+"""
 from __future__ import annotations
 
 import json
 
 from .config import iso, parse_ts, utc_now
+from .live import DUST_USD
 from .rules_lib import as_dict, decide_entry, decide_exit
 
 
@@ -37,12 +42,46 @@ def position_ctx(pos, tick: dict, ohlc: list, now: float) -> dict:
     }
 
 
+def default_exit(services) -> dict:
+    """The stop and trail a position gets while Grok has set no rule on it."""
+    risk = (getattr(services, "cfg", None) or {}).get("risk") or {}
+    return {
+        "pct": float(risk.get("stopLossPct", 0.08)),
+        "arm_pct": float(risk.get("trailArmPct", 0.08)),
+        "giveback": float(risk.get("trailGiveback", 0.05)),
+    }
+
+
+def _sell(log, services, pos, reason: str, rule_name: str, rule_params: str) -> dict:
+    result = services.sell(pos, reason, rule_name)
+    if result.get("status") == "already_closed":
+        return result
+    log.add_trade({
+        "ts": utc_now(),
+        "side": "sell",
+        "pair_id": pos.pair_id,
+        "wsname": pos.wsname,
+        "qty": result.get("qty") or pos.qty,
+        "price": result.get("price"),
+        "size_usd": result.get("proceeds_usd"),
+        "order_type": "market",
+        "reason": reason,
+        "rule_name": rule_name,
+        "rule_params": rule_params,
+        "txid": result.get("txid"),
+        "status": result.get("status") or ("filled" if result.get("ok") else "failed"),
+        "live": 1 if result.get("live") else 0,
+        "raw_json": json.dumps({k: result.get(k) for k in ("ok", "error", "status")}, default=str),
+    })
+    return result
+
+
 def run_once(log, services, now: float) -> dict:
     """Returns a summary. A failed rule holds the position; it never sells on an error."""
     positions = {p.pair_id: p for p in services.positions()}
     rules = log.active_rules()
     waiting = log.waiting_entries()
-    want = sorted({r["pair_id"] for r in rules} | {e["pair_id"] for e in waiting})
+    want = sorted({r["pair_id"] for r in rules} | {e["pair_id"] for e in waiting} | set(positions))
     ticks = services.tickers(want) if want else {}
     ohlc_cache: dict[str, list] = {}
 
@@ -57,6 +96,7 @@ def run_once(log, services, now: float) -> dict:
     closed = []
     bought = []
     errors = []
+    ruled = set()
 
     for rule in rules:
         pos = positions.get(rule["pair_id"])
@@ -69,6 +109,7 @@ def run_once(log, services, now: float) -> dict:
             continue
         if not rule.get("opened_ts") and pos.opened_ts:
             log.bind_rule(rule["id"], pos.opened_ts)
+        ruled.add(pos.pair_id)
         ctx = position_ctx(pos, ticks.get(rule["pair_id"]) or {}, candles(rule["pair_id"]), now)
         params = as_dict(rule["params_json"])
         word = decide_exit(rule["name"], params, ctx)
@@ -77,31 +118,33 @@ def run_once(log, services, now: float) -> dict:
             continue
         if word != "sell":
             continue
-        result = services.sell(pos, rule["reason"], rule["name"])
-        if result.get("status") == "already_closed":
+        result = _sell(log, services, pos, rule["reason"], rule["name"], rule["params_json"])
+        if result.get("status") == "already_closed" or result.get("ok"):
             log.deactivate_rule(rule["id"])
-            continue
-        log.add_trade({
-            "ts": utc_now(),
-            "side": "sell",
-            "pair_id": pos.pair_id,
-            "wsname": pos.wsname,
-            "qty": result.get("qty") or pos.qty,
-            "price": result.get("price"),
-            "size_usd": result.get("proceeds_usd"),
-            "order_type": "market",
-            "reason": rule["reason"],
-            "rule_name": rule["name"],
-            "rule_params": rule["params_json"],
-            "txid": result.get("txid"),
-            "status": result.get("status") or ("filled" if result.get("ok") else "failed"),
-            "live": 1 if result.get("live") else 0,
-            "raw_json": json.dumps({k: result.get(k) for k in ("ok", "error", "status")}, default=str),
-        })
-        if result.get("ok"):
-            log.deactivate_rule(rule["id"])
+        if result.get("ok") and result.get("status") != "already_closed":
             closed.append(pos.pair_id)
+        elif not result.get("ok"):
+            errors.append({"pair_id": pos.pair_id, "error": result.get("error") or "sell failed"})
+
+    default = default_exit(services)
+    for pid, pos in positions.items():
+        if pid in ruled:
+            continue
+        last = (ticks.get(pid) or {}).get("last")
+        if last is None or float(last) * float(pos.qty or 0) < DUST_USD:
+            continue
+        ctx = position_ctx(pos, ticks.get(pid) or {}, candles(pid), now)
+        if decide_exit("stop_pct", default, ctx) == "sell":
+            rule_name, reason = "stop_pct", f"Default {default['pct']:.0%} stop; no rule set."
+        elif decide_exit("trail", default, ctx) == "sell":
+            rule_name = "trail"
+            reason = f"Default trail: {default['giveback']:.0%} off the high after {default['arm_pct']:.0%} up; no rule set."
         else:
+            continue
+        result = _sell(log, services, pos, reason, rule_name, json.dumps(default))
+        if result.get("ok") and result.get("status") != "already_closed":
+            closed.append(pos.pair_id)
+        elif not result.get("ok"):
             errors.append({"pair_id": pos.pair_id, "error": result.get("error") or "sell failed"})
 
     if services.entries_blocked():

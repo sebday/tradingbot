@@ -16,7 +16,6 @@ sys.path.insert(0, str(SCRIPTS))
 import desk_book  # noqa: E402
 import desk_context  # noqa: E402
 import desk_cycle  # noqa: E402
-import desk_exit_check  # noqa: E402
 import desk_halt  # noqa: E402
 import desk_paths  # noqa: E402
 import desk_rules  # noqa: E402
@@ -143,7 +142,9 @@ class DeskShape(unittest.TestCase):
     def test_entry_timer_is_retired(self):
         self.assertTrue((ROOT / "bin" / "desk").exists())
         self.assertTrue((ROOT / "systemd" / "desk-wake.timer").exists())
-        self.assertTrue((ROOT / "systemd" / "evo-trading-exit.timer").exists())
+        self.assertTrue((ROOT / "systemd" / "desk-runner.timer").exists())
+        self.assertFalse((ROOT / "systemd" / "evo-trading-exit.timer").exists())
+        self.assertFalse((SCRIPTS / "desk_exit_check.py").exists())
         self.assertFalse((ROOT / "bin" / "run-desk-cycle").exists())
         self.assertFalse((ROOT / "systemd" / "evo-trading-desk.timer").exists())
         self.assertFalse((ROOT / "systemd" / "omarchy-trading-desk.timer").exists())
@@ -299,25 +300,6 @@ class DayBandAndExit(unittest.TestCase):
         self.assertEqual(desk_rules.day_move_failure(None, self.cfg), "DAY_FLAT")
         self.assertEqual(desk_rules.day_move_failure(0.16, self.cfg), "MOVE_SPENT")
 
-    def test_armed_winner_ignores_dead_volume(self):
-        # Peak +40% with a 5% giveback floors at 133, so 135 is still a hold.
-        self.assertEqual(desk_rules.decide(100, 140, True, 135, 0.05, True, self.cfg), "HOLD")
-
-    def test_armed_winner_closes_on_the_floor(self):
-        self.assertEqual(desk_rules.decide(100, 140, True, 132, 0.05, True, self.cfg), "TRAIL_PEAK")
-
-    def test_missing_last_is_stale_not_a_sell(self):
-        self.assertEqual(desk_rules.decide(100, 140, True, None, None, False, self.cfg), "STALE")
-
-    def test_unarmed_position_closes_on_dead_volume(self):
-        self.assertEqual(desk_rules.decide(100, 105, True, 104, 0.1, True, self.cfg), "VOLUME_6H")
-
-    def test_unarmed_position_holds_when_volume_is_alive(self):
-        self.assertEqual(desk_rules.decide(100, 105, True, 104, 0.8, True, self.cfg), "HOLD")
-
-    def test_unknown_volume_holds_instead_of_selling(self):
-        self.assertEqual(desk_rules.decide(100, 105, True, 104, None, False, self.cfg), "STALE")
-
     def test_peak_requires_the_fill_hour(self):
         fill = 1_700_000_000
         hour = fill - (fill % 3600)
@@ -328,31 +310,6 @@ class DayBandAndExit(unittest.TestCase):
             [hour + 3600, 0, 9, 0, 0, 0, 1, 0],
         ]
         self.assertEqual(desk_rules.peak_since_fill(covered, fill), (9.0, True))
-
-
-class StopLoss(unittest.TestCase):
-    def setUp(self):
-        self.cfg = json.loads((ROOT / "config.json").read_text())
-
-    def test_stop_fires_on_the_ticker_alone(self):
-        self.assertEqual(desk_rules.decide(100, None, False, 91.9, None, False, self.cfg), "STOP_LOSS")
-        self.assertEqual(desk_rules.decide(100, None, False, 92.0, None, False, self.cfg), "STOP_LOSS")
-
-    def test_stop_ignores_healthy_volume(self):
-        self.assertEqual(desk_rules.decide(100, 101, True, 90, 1.5, True, self.cfg), "STOP_LOSS")
-
-    def test_just_above_the_stop_holds(self):
-        self.assertEqual(desk_rules.decide(100, 101, True, 92.5, 1.0, True, self.cfg), "HOLD")
-
-    def test_stale_alert_fires_once_after_the_threshold(self):
-        state: dict = {}
-        cfg = {"risk": {"staleAlertMinutes": 30}}
-        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 0, cfg))
-        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 29 * 60, cfg))
-        self.assertTrue(desk_exit_check.track_stale(state, "X", True, 30 * 60, cfg))
-        self.assertFalse(desk_exit_check.track_stale(state, "X", True, 60 * 60, cfg))
-        self.assertFalse(desk_exit_check.track_stale(state, "X", False, 61 * 60, cfg))
-        self.assertNotIn("X", state)
 
 
 def write_ledger(tmp: Path, fills: list[dict], closes: list[dict]) -> None:

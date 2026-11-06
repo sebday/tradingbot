@@ -1,6 +1,6 @@
 # omarchy-trading
 
-Live Kraken USD spot desk plus the **evo.trading** Omarchy bar widget. Once an hour Grok decides and can place orders. A one-minute runner acts only on rules it set. The 5-minute exit timer still guards positions that have no rule yet.
+Live Kraken USD spot desk plus the **evo.trading** Omarchy bar widget. Once an hour Grok decides and can place orders. A one-minute runner acts on the rules it set, and holds an 8% stop and a 5% trail on any position without one.
 
 ## Omarchy bar
 
@@ -31,24 +31,13 @@ systemctl --user enable --now desk-runner.timer
 
 `bin/desk wake` builds the snapshot and resumes the chat. `bin/desk run` is the one-minute pass that sells or buys only when a rule Grok set says so. `bin/desk trades` prints the log.
 
-## Exit check
+## Exits
 
-A 5-minute timer checks every open position (`scripts/desk_rules.py`):
-
-1. `STOP_LOSS`: `risk.stopLossPct` under entry
-2. `TRAIL_PEAK`: armed at `risk.trailArmPct` over entry, closes on the giveback floor
-3. `VOLUME_6H`: dead volume while the trail is not armed
-
-A position with no price is held and alerted (`notify-send`) after `risk.staleAlertMinutes`, never sold blind. A flat book does not call Kraken.
-
-```bash
-systemctl --user link ~/projects/tradingbot/systemd/evo-trading-exit.{service,timer}
-systemctl --user enable --now evo-trading-exit.timer
-```
+The one-minute runner is the only thing that sells. It follows the exit rule Grok set on each position. A position with no rule gets a `risk.stopLossPct` stop under entry, plus a `risk.trailGiveback` trail off the high once it is `risk.trailArmPct` above entry. Quiet volume never sells unless Grok sets `volume_fade`. A position with no price, or under $1, is held.
 
 ## Positions
 
-`scripts/desk_book.py` rebuilds positions from `ledger/fills.jsonl` and `ledger/closes.jsonl`. A pair bought again after a full close is a new episode with its own entry and peak. Each hourly execute reconciles the book against Kraken balances into `ledger/reconcile.json`, and the exit check also manages untracked holdings found there.
+`scripts/desk_book.py` rebuilds positions from `ledger/fills.jsonl` and `ledger/closes.jsonl`. A pair bought again after a full close is a new episode with its own entry and peak. Each hourly execute reconciles the book against Kraken balances into `ledger/reconcile.json`, and the runner also guards untracked holdings found there.
 
 ## Scripts
 

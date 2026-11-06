@@ -118,13 +118,75 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(row["status"], "shadow")
         self.assertEqual(self.log.active_rules(), [])
 
-    def test_no_rule_does_not_sell(self):
+    def test_no_rule_gets_the_default_stop(self):
         fake = Fake()
         fake.pos = [pos()]
-        fake.ticks = {"SOLUSD": {"last": 1.0}}
+        fake.ticks = {"SOLUSD": {"last": 91.0}}
+        summary = run_once(self.log, fake, NOW)
+        self.assertEqual(summary["closed"], ["SOLUSD"])
+        row = self.log.recent_trades(1)[0]
+        self.assertEqual(row["rule_name"], "stop_pct")
+        self.assertIn("no rule set", row["reason"])
+
+    def test_no_rule_holds_on_quiet_volume(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 98.0}}
+        quiet = candles(101)
+        for row in quiet[-6:]:
+            row[6] = 0.01
+        fake.candles = {"SOLUSD": quiet}
         summary = run_once(self.log, fake, NOW)
         self.assertEqual(summary["closed"], [])
         self.assertEqual(fake.sells, [])
+
+    def test_no_rule_without_a_price_holds(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, [])
+
+    def test_no_rule_skips_dust(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 0.5}}
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, [])
+
+    def test_no_rule_trail_takes_profit_off_the_high(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 104.0}}
+        fake.candles = {"SOLUSD": candles(110)}
+        summary = run_once(self.log, fake, NOW)
+        self.assertEqual(summary["closed"], ["SOLUSD"])
+        row = self.log.recent_trades(1)[0]
+        self.assertEqual(row["rule_name"], "trail")
+        self.assertIn("no rule set", row["reason"])
+
+    def test_no_rule_trail_holds_above_the_floor(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 106.0}}
+        fake.candles = {"SOLUSD": candles(110)}
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, [])
+
+    def test_no_rule_trail_waits_until_armed(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 101.0}}
+        fake.candles = {"SOLUSD": candles(107)}
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, [])
+
+    def test_default_stop_reads_config(self):
+        fake = Fake()
+        fake.cfg = {"risk": {"stopLossPct": 0.05}}
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 94.0}}
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, ["SOLUSD"])
 
     def test_trail_holds_above_floor(self):
         fake = Fake()

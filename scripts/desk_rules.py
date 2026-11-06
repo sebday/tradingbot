@@ -1,15 +1,8 @@
 #!/usr/bin/python3 -I
-"""Pure desk rules: exits, entry guards, sizing, limit pricing. No I/O."""
+"""Pure desk rules: peak since fill, entry guards, sizing, limit pricing. No I/O."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
-
-STOP_LOSS = "STOP_LOSS"
-TRAIL_PEAK = "TRAIL_PEAK"
-VOLUME_6H = "VOLUME_6H"
-HOLD = "HOLD"
-STALE = "STALE"
-CLOSE_RULES = (STOP_LOSS, TRAIL_PEAK, VOLUME_6H)
 
 DEFAULT_EXCLUDE = (
     "USDT", "USDC", "DAI", "PYUSD", "USDG", "RLUSD", "USDS", "USDE", "FDUSD", "TUSD", "USDQ", "USDR",
@@ -45,50 +38,6 @@ def peak_since_fill(ohlc: list, fill_epoch: float | None) -> tuple[float | None,
     if not highs:
         return None, False
     return max(highs), True
-
-
-def trail_floor(entry: float, peak: float, cfg: dict) -> float:
-    risk = cfg.get("risk") or {}
-    giveback = float(risk.get("trailGiveback", 0.2))
-    floor_pct = float(risk.get("trailFloorPct", 0.1))
-    return max(peak * (1.0 - giveback), entry * (1.0 + floor_pct))
-
-
-def trail_armed(entry: float, peak: float | None, peak_known: bool, cfg: dict) -> bool:
-    if not peak_known or peak is None or entry <= 0:
-        return False
-    arm = float((cfg.get("risk") or {}).get("trailArmPct", 0.3))
-    return (peak - entry) / entry >= arm
-
-
-def stop_price(entry: float, cfg: dict) -> float:
-    stop = float((cfg.get("risk") or {}).get("stopLossPct", 0.08))
-    return entry * (1.0 - stop)
-
-
-def decide(
-    entry: float,
-    peak: float | None,
-    peak_known: bool,
-    last: float | None,
-    ratio: float | None,
-    volume_known: bool,
-    cfg: dict,
-) -> str:
-    """STOP_LOSS, TRAIL_PEAK, VOLUME_6H, HOLD, or STALE.
-
-    STALE means the position could not be measured. It is held, never sold.
-    """
-    if last is None or entry <= 0:
-        return STALE
-    if last <= stop_price(entry, cfg):
-        return STOP_LOSS
-    if trail_armed(entry, peak, peak_known, cfg):
-        return TRAIL_PEAK if last <= trail_floor(entry, peak, cfg) else HOLD
-    if not volume_known or ratio is None:
-        return STALE
-    vol_close = float((cfg.get("risk") or {}).get("volumeRatioClose", 0.2))
-    return VOLUME_6H if ratio < vol_close else HOLD
 
 
 # ---------------------------------------------------------------- entries

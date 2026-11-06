@@ -32,7 +32,8 @@ Commands:
 A buy_limit rests at or under --price. A buy_stop rests until price trades up through --price.
 at_time buys at --at, and only inside --band-low/--band-high when those are set.
 Custom rules: write rules/custom/NAME.py that reads a JSON context on stdin and prints hold, sell, wait, or buy. Then pass --name custom --params '{{"module":"NAME"}}'.
-Exit rules already on a position keep running between hours. A waiting buy expires at the next hour unless you set --expires.
+Exit rules already on a position keep running between hours. A position with no rule gets an 8% stop under entry and a 5% giveback trail once the high is 8% above entry; quiet volume never sells unless you set volume_fade.
+A waiting buy expires at the next hour unless you set --expires.
 
 Snapshot:
 {snapshot}
