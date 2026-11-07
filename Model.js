@@ -61,7 +61,8 @@ function emptyData(error) {
     positions: [],
     last_cycle: null,
     runner: {},
-    halted: false
+    halted: false,
+    data_warnings: []
   }
 }
 
@@ -92,7 +93,8 @@ function parsePayload(raw) {
     last_cycle: json.last_cycle || null,
     runner: json.runner && typeof json.runner === "object" ? json.runner : {},
     desk_root: String(json.desk_root || ""),
-    balance_error: json.balance_error || null
+    balance_error: json.balance_error || null,
+    data_warnings: Array.isArray(json.data_warnings) ? json.data_warnings.map(String) : []
   }
 }
 
@@ -119,6 +121,11 @@ function barTooltip(data, loading) {
   if (data.equity_usd !== undefined && data.equity_usd !== null && data.equity_usd !== "")
     return plain("Desk equity " + fmtUsd(data.equity_usd))
   return plain(data.tooltip || "Kraken desk")
+}
+
+function warningLine(warnings) {
+  if (!Array.isArray(warnings) || warnings.length === 0) return ""
+  return plain("Grok's last wake was missing: " + warnings.join(", "), 180)
 }
 
 function runnerLine(runner) {

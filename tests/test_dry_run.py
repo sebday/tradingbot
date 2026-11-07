@@ -107,6 +107,27 @@ class ContextSignals(unittest.TestCase):
         self.assertTrue(any(s["id"] == "paprika:SOL" for s in signals))
         self.assertFalse(any(s["id"] == "paprika:BTC" for s in signals))
 
+    def test_one_delisted_pair_does_not_blank_the_tickers(self):
+        calls = []
+
+        def fake_kraken(path):
+            calls.append(path)
+            pairs = path.split("=", 1)[1].split(",")
+            if "DEADUSD" in pairs:
+                raise RuntimeError(f"kraken {path}: ['EQuery:Unknown asset pair']")
+            return {p: {} for p in pairs}
+
+        old = ku.kraken
+        ku.kraken = fake_kraken
+        self.addCleanup(setattr, ku, "kraken", old)
+        old_metrics = ku.ticker_metrics
+        ku.ticker_metrics = lambda tick: {"last": 1.0}
+        self.addCleanup(setattr, ku, "ticker_metrics", old_metrics)
+        ids = [f"P{i}USD" for i in range(10)] + ["DEADUSD"]
+        out = ku.fetch_tickers(ids)
+        self.assertEqual(sorted(out), sorted(ids[:-1]))
+        self.assertLess(len(calls), len(ids))
+
     def test_dead_vix_does_not_degrade_context(self):
         degraded, unavailable = desk_context.context_health(["vix"])
         self.assertFalse(degraded)

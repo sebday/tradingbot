@@ -85,17 +85,17 @@ def fetch_crypto_fear_greed() -> dict | None:
 
 
 def fetch_vix() -> dict | None:
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d"
-    try:
-        raw = get_json(url, {"User-Agent": UA, "Accept": "application/json"})
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, KeyError):
-        return None
-    try:
-        meta = raw["chart"]["result"][0]["meta"]
-        price = float(meta["regularMarketPrice"])
-    except (KeyError, TypeError, ValueError, IndexError):
-        return None
-    return {"last": price, "endpoint": url}
+    # Yahoo answers 429 to a full browser User-Agent; a bare one gets through.
+    for host in ("query1", "query2"):
+        url = f"https://{host}.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d"
+        try:
+            raw = get_json(url, {"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+            meta = raw["chart"]["result"][0]["meta"]
+            return {"last": float(meta["regularMarketPrice"]), "endpoint": url}
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError,
+                KeyError, TypeError, ValueError, IndexError):
+            continue
+    return None
 
 
 def fetch_coinpaprika() -> list[dict]:

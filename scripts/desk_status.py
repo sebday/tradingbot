@@ -121,6 +121,18 @@ def _wake_running(path: Path) -> bool:
         fd.close()
 
 
+def brief_thoughts(summary: str | None, limit: int = 240) -> str:
+    """Grok's lead paragraph, cut at a sentence end when it runs long."""
+    paras = [p.strip() for p in str(summary or "").split("\n\n") if p.strip()]
+    if not paras:
+        return ""
+    text = " ".join(paras[0].split())
+    if len(text) <= limit:
+        return text
+    cut = text.rfind(". ", 0, limit)
+    return text[: cut + 1] if cut > limit // 3 else text[: limit - 1].rstrip() + "…"
+
+
 def runner_state() -> dict:
     """The bar clock is the Grok wake, not the retired hourly entry cycle."""
     if str(ROOT) not in sys.path:
@@ -132,6 +144,7 @@ def runner_state() -> dict:
     finished_at = None
     exit_code = ""
     error = ""
+    thoughts = ""
     path = db_path()
     if path.is_file():
         conn = connect(path)
@@ -143,6 +156,7 @@ def runner_state() -> dict:
             finished_at = row["ts"]
             if row["status"] == "ok":
                 exit_code = "0"
+                thoughts = brief_thoughts(row["summary"])
             else:
                 exit_code = "1"
                 error = str(row["summary"] or "wake failed")[:180]
@@ -160,8 +174,59 @@ def runner_state() -> dict:
         "finished_at": finished_at,
         "exit_code": exit_code,
         "error": error,
+        "thoughts": thoughts,
         "next_wake": next_wake_iso(),
     }
+
+
+CONTEXT_SOURCES = {
+    "cnn": "CNN fear and greed",
+    "crypto_fg": "Crypto fear and greed",
+    "vix": "VIX",
+    "coinpaprika": "CoinPaprika quotes",
+}
+
+
+def snapshot_warnings(snap: dict | None) -> list[str]:
+    """What was missing from the market data Grok decided on. Empty means it saw everything."""
+    if not snap:
+        return []
+    out: list[str] = []
+
+    def add(label: str) -> None:
+        if label not in out:
+            out.append(label)
+
+    ctx = snap.get("context") or {}
+    if ctx.get("error"):
+        add("Market context failed")
+    else:
+        for name in ctx.get("errors") or []:
+            add(CONTEXT_SOURCES.get(str(name), str(name)))
+        if not ctx.get("crypto_fear_greed"):
+            add("Crypto fear and greed")
+        if not ctx.get("cnn_fear_greed"):
+            add("CNN fear and greed")
+        if ctx.get("vix") is None:
+            add("VIX")
+    if any(str(e).startswith("board") for e in snap.get("errors") or []) or not snap.get("board"):
+        add("Price board")
+    for err in snap.get("errors") or []:
+        if not str(err).startswith("board"):
+            add(str(err).split(":", 1)[0].strip().capitalize() or "Snapshot error")
+    return out
+
+
+def last_snapshot_warnings() -> list[str]:
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from desk.config import state_dir
+
+    try:
+        snap = json.loads((state_dir() / "last-snapshot.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return snapshot_warnings(snap)
 
 
 def main() -> int:
@@ -278,6 +343,7 @@ def main() -> int:
         "positions": positions,
         "last_cycle": last_cycle,
         "runner": runner_state(),
+        "data_warnings": last_snapshot_warnings(),
         "balance_error": balance_err,
         "desk_root": str(ROOT),
         "fetched_at": utc_now(),

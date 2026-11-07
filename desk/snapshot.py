@@ -109,11 +109,13 @@ def _context() -> dict:
     except Exception as exc:
         return {"error": str(exc)}
     fg = payload.get("cryptoFearGreed") or {}
+    cnn = payload.get("cnn") or {}
     vix = payload.get("vix") or {}
     return {
         "degraded": bool(payload.get("degraded") or payload.get("unavailable")),
-        "crypto_fear_greed": fg.get("value") if isinstance(fg, dict) else fg,
-        "vix": vix.get("price") if isinstance(vix, dict) else vix,
+        "crypto_fear_greed": {"score": fg.get("score"), "rating": fg.get("rating")} if fg else None,
+        "cnn_fear_greed": {"score": round(float(cnn["score"]), 1), "rating": cnn.get("rating")} if cnn.get("score") is not None else None,
+        "vix": vix.get("last"),
         "signals": [
             {"name": s.get("name") or s.get("asset") or s.get("id"), "title": s.get("title") or s.get("headline")}
             for s in (payload.get("signals") or [])[:8]

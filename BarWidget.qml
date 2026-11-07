@@ -35,6 +35,7 @@ BarWidget {
   }
 
   readonly property bool iconError: panelLoader.item ? panelLoader.item.iconError === true : false
+  readonly property bool iconWarning: panelLoader.item ? panelLoader.item.iconWarning === true : false
   readonly property bool iconBusy: panelLoader.item ? panelLoader.item.iconBusy === true : false
   readonly property bool iconMuted: panelLoader.item ? panelLoader.item.iconMuted === true : false
   readonly property string tooltip: panelLoader.item ? panelLoader.item.barTooltip : "Kraken desk"
@@ -71,8 +72,11 @@ BarWidget {
     leadingIcon: root.iconText
     hasVisualContent: root.valueText !== "" || root.iconBusy
     horizontalMargin: 8.75
-    active: root.iconError
-    useActiveColor: root.iconError
+    active: root.iconError || root.iconWarning
+    useActiveColor: root.iconError || root.iconWarning
+    activeColor: root.iconError || !panelLoader.item
+      ? (root.bar ? root.bar.urgent : Theme.urgent)
+      : panelLoader.item.warnColor
     dimmed: root.iconMuted && !root.iconError
     tooltipText: Model.plain(root.tooltip)
 

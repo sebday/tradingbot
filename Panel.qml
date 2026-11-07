@@ -23,6 +23,7 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.4)
   property color themeGreen: Theme.ansiFallback("green")
   property color themeRed: Theme.ansiFallback("red")
+  property color themeYellow: Theme.ansiFallback("yellow")
   readonly property color surface: Theme.popups.background
   readonly property string fontFamily: bar ? bar.fontFamily : Theme.font.family
 
@@ -49,9 +50,13 @@ Panel {
     return code !== "" && code !== "0"
   }
   readonly property bool iconError: deskDown
+  readonly property var dataWarnings: hasData && Array.isArray(data.data_warnings) ? data.data_warnings : []
+  readonly property bool iconWarning: !iconError && dataWarnings.length > 0
+  readonly property color warnColor: themeYellow
+  readonly property string grokThoughts: hasData && data.runner ? Model.plain(data.runner.thoughts, 260) : ""
   readonly property bool iconBusy: loading
   readonly property bool iconMuted: false
-  readonly property string barTooltip: Model.barTooltip(data, loading)
+  readonly property string barTooltip: Model.barTooltip(data, loading) + (iconWarning ? "\n" + Model.warningLine(dataWarnings) : "")
   readonly property string deskIcon: Model.deskIcon()
   readonly property string barAmount: Model.barAmount(data)
   readonly property string barIcon: barAmount !== "" ? deskIcon : ""
@@ -61,17 +66,18 @@ Panel {
   readonly property int positionHidden: Math.max(0, allPositions.length - positions.length)
   readonly property var unrealized: Model.unrealizedUsd(allPositions)
   readonly property string badge: Model.deskBadge(data)
-  readonly property color badgeColor: deskDown ? themeRed : themeGreen
+  readonly property color badgeColor: deskDown ? themeRed : (iconWarning ? themeYellow : themeGreen)
 
   function loadThemeColors(raw) {
     var found = {}
     var lines = String(raw || "").split("\n")
     for (var i = 0; i < lines.length; i++) {
-      var match = lines[i].match(/^\s*(green|red|color1|color2)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
+      var match = lines[i].match(/^\s*(green|red|yellow|color1|color2|color3)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
       if (match) found[match[1]] = match[2]
     }
     themeGreen = found.green || found.color2 || Theme.ansiFallback("green")
     themeRed = found.red || found.color1 || Theme.ansiFallback("red")
+    themeYellow = found.yellow || found.color3 || Theme.ansiFallback("yellow")
   }
   readonly property real pairColWidth: columnWidth(pairMetrics, positions, function(p) {
     return Model.plain(p && (p.wsname || p.pair_id))
@@ -400,6 +406,30 @@ Panel {
             }
           }
 
+          Rectangle {
+            visible: root.iconWarning
+            width: parent.width
+            implicitHeight: warnText.implicitHeight + Theme.space(12)
+            radius: Theme.cornerRadius
+            color: Qt.rgba(root.warnColor.r, root.warnColor.g, root.warnColor.b, 0.14)
+            border.width: 1
+            border.color: Qt.rgba(root.warnColor.r, root.warnColor.g, root.warnColor.b, 0.4)
+
+            Text {
+              id: warnText
+              textFormat: Text.PlainText
+              anchors.centerIn: parent
+              width: parent.width - Theme.space(16)
+              text: Model.warningLine(root.dataWarnings)
+              color: root.warnColor
+              font.family: root.fontFamily
+              font.pixelSize: Theme.font.bodySmall
+              font.bold: true
+              wrapMode: Text.WordWrap
+              horizontalAlignment: Text.AlignHCenter
+            }
+          }
+
           Text {
             textFormat: Text.PlainText
             width: parent.width
@@ -438,6 +468,30 @@ Panel {
               label: "halt floor"
               valueColor: root.dim
             }
+          }
+
+          PanelSeparator {
+            visible: root.grokThoughts !== ""
+            foreground: root.foreground
+          }
+
+          PanelSectionHeader {
+            visible: root.grokThoughts !== ""
+            width: parent.width
+            text: "GROK · " + Model.clock(root.data.runner && root.data.runner.finished_at)
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+
+          Text {
+            textFormat: Text.PlainText
+            width: parent.width
+            visible: root.grokThoughts !== ""
+            text: root.grokThoughts
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Theme.font.bodySmall
+            wrapMode: Text.WordWrap
           }
 
           PanelSeparator {

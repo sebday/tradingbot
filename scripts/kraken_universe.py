@@ -151,11 +151,22 @@ def fetch_tickers(pair_ids: list[str]) -> dict[str, dict]:
     out: dict[str, dict] = {}
     chunk = 40
     for i in range(0, len(pair_ids), chunk):
-        batch = pair_ids[i : i + chunk]
-        result = kraken("Ticker?pair=" + ",".join(batch))
-        for pair_id, tick in result.items():
+        for pair_id, tick in _ticker_batch(pair_ids[i : i + chunk]).items():
             out[pair_id] = ticker_metrics(tick)
     return out
+
+
+def _ticker_batch(batch: list[str]) -> dict:
+    """One delisted pair fails the whole request, so halve the batch until it is isolated and dropped."""
+    try:
+        return kraken("Ticker?pair=" + ",".join(batch))
+    except RuntimeError as exc:
+        if "Unknown asset pair" not in str(exc):
+            raise
+        if len(batch) == 1:
+            return {}
+    mid = len(batch) // 2
+    return {**_ticker_batch(batch[:mid]), **_ticker_batch(batch[mid:])}
 
 
 def fetch_ohlc(pair_id: str, interval: int = 60) -> list[list]:

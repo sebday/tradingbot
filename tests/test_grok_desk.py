@@ -180,6 +180,17 @@ class DeskTests(unittest.TestCase):
         run_once(self.log, fake, NOW)
         self.assertEqual(fake.sells, [])
 
+    def test_none_rule_overrides_the_default_stop(self):
+        fake = Fake()
+        fake.pos = [pos()]
+        fake.ticks = {"SOLUSD": {"last": 50.0}}
+        self.log.set_rule({
+            "pair_id": "SOLUSD", "opened_ts": OPENED, "name": "none", "params": {},
+            "reason": "hold no matter what", "set_at": "t",
+        })
+        run_once(self.log, fake, NOW)
+        self.assertEqual(fake.sells, [])
+
     def test_default_stop_reads_config(self):
         fake = Fake()
         fake.cfg = {"risk": {"stopLossPct": 0.05}}
@@ -292,6 +303,45 @@ class DeskTests(unittest.TestCase):
         stale = desk_status.runner_state()
         self.assertTrue(stale["stale"])
         self.assertEqual(stale["finished_at"], "2026-10-28T10:00:00Z")
+
+    def test_panel_warns_when_grok_saw_missing_data(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import desk_status
+
+        full = {
+            "context": {
+                "crypto_fear_greed": {"score": 28, "rating": "Fear"},
+                "cnn_fear_greed": {"score": 22.1, "rating": "extreme fear"},
+                "vix": 25.6, "errors": [],
+            },
+            "board": [{"pair_id": "XXBTZUSD"}],
+            "errors": [],
+        }
+        self.assertEqual(desk_status.snapshot_warnings(full), [])
+        broken = {
+            "context": {"crypto_fear_greed": None, "vix": None, "errors": ["vix"]},
+            "board": [],
+            "errors": ["board: kraken Ticker?pair=...: ['EQuery:Unknown asset pair']"],
+        }
+        self.assertEqual(
+            desk_status.snapshot_warnings(broken),
+            ["VIX", "Crypto fear and greed", "CNN fear and greed", "Price board"],
+        )
+        self.assertEqual(desk_status.snapshot_warnings({"context": {"error": "boom"}, "board": [1]}),
+                         ["Market context failed"])
+        self.assertEqual(desk_status.snapshot_warnings(None), [])
+
+    def test_panel_thoughts_are_the_lead_paragraph(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import desk_status
+
+        text = "Holding BTC. The stop is off.\n\nEquity is $458.\n\nNothing else."
+        self.assertEqual(desk_status.brief_thoughts(text), "Holding BTC. The stop is off.")
+        lead = "Holding BTC through the chop because the owner wants a plain hold and no stop."
+        long = lead + " Second sentence keeps going. " + "word " * 80
+        self.assertEqual(desk_status.brief_thoughts(long), lead + " Second sentence keeps going.")
+        self.assertTrue(desk_status.brief_thoughts("x" * 400).endswith("…"))
+        self.assertEqual(desk_status.brief_thoughts(None), "")
 
     def test_cli_requires_a_reason(self):
         proc = subprocess.run(
