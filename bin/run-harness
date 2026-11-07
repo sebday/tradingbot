@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# systemd entry point: bin/run-harness <cycle|exits|eval> [args...]
+# Logs to state/logs/<cmd>.log. Never prints secrets (the harness does not).
+set -euo pipefail
+_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cmd="${1:?usage: run-harness cycle|exits|eval [args]}"; shift || true
+mkdir -p -m 700 "${_root}/state/logs"
+umask 077
+log="${_root}/state/logs/${cmd}.log"
+set +e
+{
+  echo "=== ${cmd} $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+  "${_root}/bin/desk" "${cmd}" "$@"
+  rc=$?
+  echo "=== rc=${rc} ==="
+  exit "$rc"
+} >>"$log" 2>&1

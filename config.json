@@ -56,13 +56,38 @@
     "dayMoveMax": 0.15,
     "minRange24h": 0.01,
     "excludeBases": [
-      "USDT", "USDC", "DAI", "PYUSD", "USDG", "RLUSD", "USDS", "USDE", "FDUSD", "TUSD", "USDQ", "USDR",
-      "EURC", "EURQ", "EURR", "EUR", "GBP", "AUD", "CAD", "CHF", "JPY"
+      "USDT",
+      "USDC",
+      "DAI",
+      "PYUSD",
+      "USDG",
+      "RLUSD",
+      "USDS",
+      "USDE",
+      "FDUSD",
+      "TUSD",
+      "USDQ",
+      "USDR",
+      "EURC",
+      "EURQ",
+      "EURR",
+      "EUR",
+      "GBP",
+      "AUD",
+      "CAD",
+      "CHF",
+      "JPY"
     ]
   },
   "desk": {
     "live": true,
     "model": "grok-4.7-high",
     "wakeTimeoutSeconds": 900
+  },
+  "harness": {
+    "mode": "paper",
+    "seat": {
+      "sandbox": "disabled"
+    }
   }
 }
