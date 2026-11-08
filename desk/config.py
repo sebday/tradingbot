@@ -46,13 +46,21 @@ def iso(epoch: float) -> str:
     return datetime.fromtimestamp(epoch, timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+# desk-wake.timer fires at :02 and :32. Stale is one missed slot plus 10 minutes.
+WAKE_MINUTES = (2, 32)
+WAKE_STALE_MINUTES = 40
+
+
 def next_wake_iso(now: float | None = None) -> str:
-    """The next HH:02 UTC, which is when the hourly wake runs."""
+    """The next :02 or :32 UTC, which is when the half-hour wake runs."""
     moment = datetime.now(timezone.utc) if now is None else datetime.fromtimestamp(now, timezone.utc)
-    target = moment.replace(minute=2, second=0, microsecond=0)
-    if moment >= target:
-        target += timedelta(hours=1)
-    return target.isoformat().replace("+00:00", "Z")
+    candidates = []
+    for minute in WAKE_MINUTES:
+        target = moment.replace(minute=minute, second=0, microsecond=0)
+        if moment >= target:
+            target += timedelta(hours=1)
+        candidates.append(target)
+    return min(candidates).isoformat().replace("+00:00", "Z")
 
 
 def halt_path() -> Path:

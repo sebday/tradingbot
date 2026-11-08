@@ -1,5 +1,5 @@
 [Unit]
-Description=Grok desk hourly decision
+Description=Grok desk decision every 30 minutes
 After=network-online.target
 Wants=network-online.target
 

@@ -137,7 +137,7 @@ def runner_state() -> dict:
     """The bar clock is the Grok wake, not the retired hourly entry cycle."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from desk.config import next_wake_iso, state_dir
+    from desk.config import WAKE_STALE_MINUTES, next_wake_iso, state_dir
     from desk.db import connect, db_path
 
     running = _wake_running(state_dir() / "wake.lock")
@@ -164,7 +164,7 @@ def runner_state() -> dict:
     if finished_at and not running:
         try:
             t = datetime.fromisoformat(str(finished_at).replace("Z", "+00:00"))
-            stale = (datetime.now(timezone.utc) - t).total_seconds() / 60.0 > 70
+            stale = (datetime.now(timezone.utc) - t).total_seconds() / 60.0 > WAKE_STALE_MINUTES
         except ValueError:
             stale = True
     return {

@@ -1,6 +1,6 @@
 """bin/desk: the Grok desk.
 
-  wake                         hourly decision (Grok 4.7, resumed chat)
+  wake                         decision every 30 minutes (Grok 4.7, resumed chat)
   chat                         open that chat in this terminal
   run                          one pass of the exit and entry rules
   snapshot                     print the snapshot JSON

@@ -131,7 +131,7 @@ function warningLine(warnings) {
 function runnerLine(runner) {
   if (!runner || typeof runner !== "object") return "No wake yet"
   if (runner.running) return "Wake running"
-  if (runner.stale) return "Over 70m ago"
+  if (runner.stale) return "Over 40m ago"
   if (runner.finished_at) return "Last wake " + clock(runner.finished_at)
   if (runner.next_wake) return "Next wake " + clock(runner.next_wake)
   return "No wake yet"

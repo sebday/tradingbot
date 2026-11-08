@@ -1,8 +1,8 @@
 [Unit]
-Description=Grok desk decision at minute :02 of each hour
+Description=Grok desk decision at :02 and :32
 
 [Timer]
-OnCalendar=*-*-* *:02:00
+OnCalendar=*-*-* *:02,32:00
 AccuracySec=30s
 Persistent=false
 
