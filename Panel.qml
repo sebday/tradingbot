@@ -353,7 +353,9 @@ Panel {
           Text {
             textFormat: Text.PlainText
             width: parent.width
-            visible: root.iconError
+            // iconError is also set for a stale desk, whose error string is empty.
+            // An empty Text still occupies a line and the column gap above the hero.
+            visible: root.iconError && Model.plain(root.data.error) !== ""
             text: Model.plain(root.data.error)
             color: root.urgent
             font.family: root.fontFamily
